@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Lampen</title>
+<meta name="theme-color" content="#0f1216">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Ccircle cx=%2212%22 cy=%2210%22 r=%227%22 fill=%22%23f5b94a%22/%3E%3Crect x=%229%22 y=%2218%22 width=%226%22 height=%223%22 rx=%221%22 fill=%22%23f5b94a%22/%3E%3C/svg%3E">
+<style>
+:root{
+  --gold:#f5b94a; --gold-bright:#ffd88a; --gold-deep:#a8741c;
+  --bg:#0f1216; --panel:#1a1e24; --panel2:#15181d;
+  --line:rgba(255,255,255,.08); --line-strong:rgba(245,185,74,.5);
+  --txt:#eef1f5; --muted:rgba(238,241,245,.55); --faint:rgba(238,241,245,.3);
+  --grad-gold:linear-gradient(180deg,#ffe3a6 0%,#f5b94a 100%);
+  --red:#e07a5f;
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);overflow:hidden;
+  font-family:Inter,Roboto,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 80% 60% at 10% -10%,rgba(120,140,170,.10),transparent 60%)}
+button{font-family:inherit;color:inherit}
+
+#app{position:relative;display:flex;flex-direction:column;height:100vh;padding:14px 18px 16px;gap:12px}
+
+/* Kopregel */
+header{flex:0 0 auto;display:flex;align-items:center;gap:14px;min-height:52px}
+.titel{font-size:22px;font-weight:650;letter-spacing:.01em;color:var(--txt)}
+.stip{width:9px;height:9px;border-radius:50%;background:#6fbf73;box-shadow:0 0 8px rgba(111,191,115,.7);flex:0 0 auto;transition:background .3s}
+.stip.bezig{background:var(--gold);box-shadow:0 0 8px rgba(245,185,74,.7)}
+.stip.fout{background:var(--red);box-shadow:0 0 8px rgba(224,122,95,.7)}
+.ruimte{flex:1}
+.klok{font-size:30px;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:.02em;color:var(--txt)}
+.knop{appearance:none;border:1px solid var(--line);background:#1f242b;
+  border-radius:999px;padding:0 22px;height:48px;font-size:17px;font-weight:600;cursor:pointer;color:var(--txt);
+  transition:transform .15s var(--ease),border-color .2s}
+.knop:active{transform:scale(.96);border-color:var(--line-strong)}
+
+/* Raster met ruimtes */
+#raster{flex:1;min-height:0;display:grid;gap:12px;overflow-y:auto;scrollbar-width:none}
+#raster::-webkit-scrollbar{display:none}
+
+.tegel{position:relative;display:flex;flex-direction:column;justify-content:space-between;gap:10px;
+  min-height:150px;padding:16px 18px 18px;border-radius:22px;overflow:hidden;
+  background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+  transition:border-color .3s,box-shadow .3s}
+.tegel::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .4s var(--ease);
+  background:radial-gradient(ellipse 90% 90% at 85% 0%,rgba(255,206,120,.30),rgba(245,185,74,.08) 55%,transparent 80%)}
+.tegel.aan{border-color:var(--line-strong);box-shadow:0 10px 30px -14px rgba(245,185,74,.45)}
+.tegel.aan::before{opacity:var(--gloed,1)}
+.tegel > *{position:relative}
+
+.kop{display:flex;align-items:flex-start;gap:12px}
+.naam{flex:1;min-width:0;cursor:pointer}
+.naam b{display:block;font-size:24px;font-weight:650;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.naam span{display:block;margin-top:4px;font-size:15px;color:var(--muted)}
+.naam span::after{content:" ›";color:var(--faint)}
+
+.aanuit{appearance:none;flex:0 0 auto;width:68px;height:68px;border-radius:50%;cursor:pointer;
+  border:1px solid var(--line);background:#111418;display:grid;place-items:center;
+  transition:transform .15s var(--ease),background .3s,box-shadow .3s}
+.aanuit svg{width:30px;height:30px;stroke:var(--faint);transition:stroke .3s}
+.aanuit:active{transform:scale(.92)}
+.tegel.aan .aanuit{background:var(--grad-gold);border-color:transparent;box-shadow:0 0 26px -2px rgba(255,206,120,.5)}
+.tegel.aan .aanuit svg{stroke:#3a2705}
+.tegel.bezig .aanuit{animation:puls 1s ease-in-out infinite}
+@keyframes puls{50%{opacity:.55}}
+
+/* Helderheid */
+.dim{display:flex;align-items:center;gap:12px}
+.dim .pct{width:52px;text-align:right;font-size:16px;font-variant-numeric:tabular-nums;color:var(--muted)}
+input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:40px;background:transparent;margin:0;touch-action:none;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:12px;border-radius:999px;
+  background:linear-gradient(90deg,var(--gold) 0 var(--v,50%),rgba(255,255,255,.10) var(--v,50%) 100%)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:34px;height:34px;margin-top:-11px;border-radius:50%;
+  background:#fff;border:3px solid var(--gold);box-shadow:0 2px 10px rgba(0,0,0,.5)}
+input[type=range]::-moz-range-track{height:12px;border-radius:999px;background:rgba(255,255,255,.10)}
+input[type=range]::-moz-range-progress{height:12px;border-radius:999px;background:var(--gold)}
+input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#fff;border:3px solid var(--gold)}
+input[type=range]:disabled{opacity:.35}
+.tegel:not(.aan) input[type=range]::-webkit-slider-runnable-track{background:linear-gradient(90deg,rgba(245,185,74,.30) 0 var(--v,50%),rgba(255,255,255,.07) var(--v,50%) 100%)}
+
+/* Paneel met losse lampen */
+#paneel{position:fixed;inset:0;z-index:20;display:none;align-items:stretch;justify-content:flex-end;background:rgba(0,0,0,.55)}
+#paneel.open{display:flex}
+.vel{width:min(560px,92vw);height:100%;background:#15181d;border-left:1px solid var(--line);
+  display:flex;flex-direction:column;padding:16px 18px;gap:12px;animation:schuif .22s var(--ease)}
+@keyframes schuif{from{transform:translateX(40px);opacity:0}}
+.vel-kop{display:flex;align-items:center;gap:12px}
+.vel-kop b{flex:1;font-size:24px;font-weight:650}
+.sluit{width:48px;height:48px;padding:0;font-size:26px;line-height:1}
+#lampen{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;scrollbar-width:none}
+#lampen::-webkit-scrollbar{display:none}
+.lamp{display:grid;grid-template-columns:1fr auto;gap:4px 14px;align-items:center;padding:10px 14px;border-radius:16px;
+  background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.lamp.aan{border-color:var(--line-strong);background:rgba(245,185,74,.08)}
+.lamp .ln{font-size:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lamp .ln small{display:block;font-size:13px;font-weight:500;color:var(--red)}
+.lamp .dim{grid-column:1/-1}
+.schakel{appearance:none;width:72px;height:42px;border-radius:999px;border:1px solid var(--line);background:#111418;position:relative;cursor:pointer;transition:background .25s}
+.schakel::after{content:"";position:absolute;top:4px;left:4px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.35);transition:transform .25s var(--ease),background .25s}
+.lamp.aan .schakel{background:var(--grad-gold);border-color:transparent}
+.lamp.aan .schakel::after{transform:translateX(30px);background:#fff}
+.lamp.offline{opacity:.5}
+
+/* Meldingen */
+#melding{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:30;
+  padding:12px 20px;border-radius:14px;background:#2a1712;border:1px solid rgba(224,122,95,.5);color:#ffd9cf;font-size:16px;
+  transition:all .25s var(--ease);max-width:90vw;text-align:center}
+#melding.toon{opacity:1;transform:translate(-50%,0)}
+#demo{position:fixed;right:14px;bottom:12px;font-size:12px;color:var(--faint);letter-spacing:.04em}
+.leeg{grid-column:1/-1;align-self:center;text-align:center;color:var(--muted);font-size:18px;line-height:1.5}
+
+@media (max-height:520px){ .tegel{min-height:120px;padding:12px 14px 12px} .naam b{font-size:20px} .aanuit{width:56px;height:56px} }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span class="titel">Lampen</span>
+    <span class="stip" id="stip" title=""></span>
+    <span class="ruimte"></span>
+    <span class="klok" id="klok">--:--</span>
+    <button class="knop" id="allesUit">Alles uit</button>
+  </header>
+  <main id="raster"><div class="leeg">Lampen laden…</div></main>
+</div>
+
+<div id="paneel">
+  <div class="vel">
+    <div class="vel-kop"><b id="velNaam"></b><button class="knop sluit" id="sluit" aria-label="Sluiten">×</button></div>
+    <div id="lampen"></div>
+  </div>
+</div>
+<div id="melding"></div>
+<div id="demo" hidden>DEMO · nog niet gekoppeld</div>
+
+<script>
+(function(){
+  /* ---------- Instellingen ----------
+     Geef de /exec-URL van apps-script.gs en de sleutel mee in de URL:
+     ?api=<exec-url>&key=<SLEUTEL>  (lampen.py doet dat vanzelf). */
+  var API_URL = '';
+
+  var qs = new URLSearchParams(location.search);
+  function bewaar(k, v){ try{ if(v) localStorage.setItem('lampen_'+k, v); return v || localStorage.getItem('lampen_'+k) || ''; }catch(e){ return v || ''; } }
+  var API = bewaar('api', qs.get('api')) || API_URL;
+  var KEY = bewaar('key', qs.get('key'));
+  var POLL = Math.max(20, Number(qs.get('poll')) || 120) * 1000;
+  var DEMO = !API || qs.has('demo');
+
+  var ICOON = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.2a8 8 0 1 0 11.4 0"/></svg>';
+
+  var ruimtes = [];
+  var bezig = {};          // ruimte-id -> true terwijl een opdracht loopt
+  var open = null;         // ruimte-id van het geopende paneel
+  var bijwerkTimer = null;
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------- Klok ---------- */
+  function klok(){
+    var d = new Date();
+    $('klok').textContent = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+  klok(); setInterval(klok, 5000);
+
+  /* ---------- Communicatie ---------- */
+  function stip(s, tekst){ $('stip').className = 'stip' + (s ? ' '+s : ''); $('stip').title = tekst || ''; }
+
+  function melding(t){
+    var m = $('melding'); m.textContent = t; m.classList.add('toon');
+    clearTimeout(melding.t); melding.t = setTimeout(function(){ m.classList.remove('toon'); }, 4000);
+  }
+
+  function haalStand(vers){
+    if (DEMO) { if (!ruimtes.length) ruimtes = demoData(); teken(); return Promise.resolve(); }
+    stip('bezig');
+    var url = API + (API.indexOf('?') >= 0 ? '&' : '?') + 'action=' + (vers ? 'refresh' : 'state') + '&key=' + encodeURIComponent(KEY) + '&_=' + Date.now();
+    return fetch(url, { cache:'no-store' }).then(function(r){ return r.json(); }).then(function(j){
+      if (!j.ok) throw new Error(j.fout || 'Onbekende fout');
+      // Lopende opdrachten niet overschrijven met oudere stand
+      var oud = {}; ruimtes.forEach(function(r){ oud[r.id] = r; });
+      ruimtes = j.ruimtes.map(function(r){ return bezig[r.id] && oud[r.id] ? oud[r.id] : r; });
+      stip('', 'Bijgewerkt ' + new Date().toLocaleTimeString('nl-NL'));
+      teken();
+    }).catch(function(e){
+      stip('fout', String(e.message || e));
+      if (!ruimtes.length) $('raster').innerHTML = '<div class="leeg">Kan de lampen niet bereiken.<br><small>' + esc(e.message || e) + '</small></div>';
+      else melding('Geen verbinding: ' + (e.message || e));
+    });
+  }
+
+  function stuur(ruimteId, ids, aan, helder){
+    if (DEMO) return new Promise(function(ok){ setTimeout(ok, 350); });
+    var body = { key: KEY, action: 'set', ids: ids };
+    if (aan !== null) body.on = aan;
+    if (helder !== null) body.bright = helder;
+    return fetch(API, { method:'POST', body: JSON.stringify(body) }).then(function(r){ return r.json(); }).then(function(j){
+      if (!j.ok) throw new Error(j.fout || 'Onbekende fout');
+      var mis = (j.resultaat || []).filter(function(x){ return !x.ok; });
+      if (mis.length) melding(mis.length + ' lamp' + (mis.length > 1 ? 'en reageerden' : ' reageerde') + ' niet');
+    });
+  }
+
+  /* Voert een wijziging direct zichtbaar door, stuurt hem en haalt daarna de echte stand op. */
+  function wijzig(r, lampen, aan, helder){
+    var ids = lampen.filter(function(l){ return l.online; }).map(function(l){ return l.id; });
+    if (!ids.length) { melding('Geen lampen online in ' + r.name); return; }
+    lampen.forEach(function(l){
+      if (!l.online) return;
+      if (aan !== null) l.on = aan;
+      if (helder !== null) { l.bright = helder; l.on = true; }
+    });
+    bezig[r.id] = (bezig[r.id] || 0) + 1;
+    teken();
+    stuur(r.id, ids, aan, helder).catch(function(e){ melding('Mislukt: ' + (e.message || e)); })
+      .then(function(){
+        bezig[r.id]--; if (!bezig[r.id]) delete bezig[r.id];
+        clearTimeout(bijwerkTimer);
+        bijwerkTimer = setTimeout(function(){ haalStand(); }, 3500);
+        teken();
+      });
+  }
+
+  /* ---------- Tekenen ---------- */
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function aantalAan(r){ return r.lamps.filter(function(l){ return l.on; }).length; }
+  function gemHelder(r){
+    var a = r.lamps.filter(function(l){ return l.on && l.bright != null; });
+    if (!a.length) a = r.lamps.filter(function(l){ return l.bright != null; });
+    if (!a.length) return null;
+    return Math.round(a.reduce(function(s,l){ return s + l.bright; }, 0) / a.length);
+  }
+
+  function kolommen(n){
+    var w = innerWidth;
+    if (w < 640) return 1;
+    if (n <= 2) return n;
+    if (n <= 4) return 2;
+    if (n <= 6 || w < 900) return 3;
+    return 4;
+  }
+
+  function teken(){
+    var el = $('raster');
+    if (!ruimtes.length) { el.innerHTML = '<div class="leeg">Geen lampen gevonden.</div>'; return; }
+    var k = kolommen(ruimtes.length), rijen = Math.ceil(ruimtes.length / k);
+    el.style.gridTemplateColumns = 'repeat(' + k + ',minmax(0,1fr))';
+    el.style.gridAutoRows = rijen <= 3 ? 'minmax(150px,1fr)' : '160px';
+
+    // Bestaande tegels hergebruiken zodat een schuifregelaar niet wegspringt tijdens het slepen
+    var bestaand = {};
+    Array.prototype.forEach.call(el.querySelectorAll('.tegel'), function(t){ bestaand[t.dataset.id] = t; });
+    var leeg = el.querySelector('.leeg'); if (leeg) leeg.remove();
+
+    ruimtes.forEach(function(r, i){
+      var t = bestaand[r.id];
+      if (!t) { t = maakTegel(r); }
+      delete bestaand[r.id];
+      if (el.children[i] !== t) el.insertBefore(t, el.children[i] || null);
+      werkTegelBij(t, r);
+    });
+    Object.keys(bestaand).forEach(function(id){ bestaand[id].remove(); });
+    if (open) tekenPaneel();
+  }
+
+  function maakTegel(r){
+    var t = document.createElement('section');
+    t.className = 'tegel'; t.dataset.id = r.id;
+    t.innerHTML = '<div class="kop"><div class="naam"><b></b><span></span></div>' +
+      '<button class="aanuit" aria-label="Aan/uit">' + ICOON + '</button></div>' +
+      '<div class="dim"><input type="range" min="1" max="100" step="1"><span class="pct"></span></div>';
+    t.querySelector('.aanuit').addEventListener('click', function(){
+      var ruimte = vind(t.dataset.id); if (!ruimte) return;
+      wijzig(ruimte, ruimte.lamps, aantalAan(ruimte) === 0, null);
+    });
+    t.querySelector('.naam').addEventListener('click', function(){ open = t.dataset.id; tekenPaneel(); $('paneel').classList.add('open'); });
+    koppelSchuif(t.querySelector('input'), t.querySelector('.pct'), function(v){
+      var ruimte = vind(t.dataset.id); if (ruimte) wijzig(ruimte, ruimte.lamps, null, v);
+    });
+    return t;
+  }
+
+  function werkTegelBij(t, r){
+    var n = aantalAan(r), tot = r.lamps.length, h = gemHelder(r);
+    var offline = r.lamps.filter(function(l){ return !l.online; }).length;
+    t.classList.toggle('aan', n > 0);
+    t.classList.toggle('bezig', !!bezig[r.id]);
+    t.style.setProperty('--gloed', n > 0 ? (0.35 + 0.65 * (h == null ? 1 : h / 100)).toFixed(2) : 0);
+    t.querySelector('.naam b').textContent = r.name;
+    t.querySelector('.naam span').textContent =
+      (n === 0 ? 'Uit' : n === tot ? (tot === 1 ? 'Aan' : 'Alle ' + tot + ' aan') : n + ' van ' + tot + ' aan') +
+      (offline ? ' · ' + offline + ' offline' : '');
+    zetSchuif(t.querySelector('input'), t.querySelector('.pct'), h);
+  }
+
+  function zetSchuif(inp, pct, h){
+    if (inp.dataset.sleept) return;
+    inp.disabled = h == null;
+    inp.value = h == null ? 100 : h;
+    inp.style.setProperty('--v', (h == null ? 0 : h) + '%');
+    pct.textContent = h == null ? '' : h + '%';
+  }
+
+  function koppelSchuif(inp, pct, klaar){
+    inp.addEventListener('input', function(){
+      inp.dataset.sleept = '1';
+      inp.style.setProperty('--v', inp.value + '%'); pct.textContent = inp.value + '%';
+    });
+    inp.addEventListener('change', function(){ delete inp.dataset.sleept; klaar(Number(inp.value)); });
+  }
+
+  function vind(id){ for (var i = 0; i < ruimtes.length; i++) if (ruimtes[i].id === id) return ruimtes[i]; return null; }
+
+  /* ---------- Paneel met losse lampen ---------- */
+  function tekenPaneel(){
+    var r = vind(open); if (!r) { sluitPaneel(); return; }
+    $('velNaam').textContent = r.name;
+    var lijst = $('lampen');
+    if (lijst.dataset.ruimte !== r.id || lijst.children.length !== r.lamps.length) {
+      lijst.dataset.ruimte = r.id; lijst.innerHTML = '';
+      r.lamps.forEach(function(l){
+        var d = document.createElement('div'); d.className = 'lamp'; d.dataset.id = l.id;
+        d.innerHTML = '<div class="ln"></div><button class="schakel" aria-label="Aan/uit"></button>' +
+          '<div class="dim"><input type="range" min="1" max="100" step="1"><span class="pct"></span></div>';
+        d.querySelector('.schakel').addEventListener('click', function(){
+          var ru = vind(open), la = ru && ru.lamps.filter(function(x){ return x.id === l.id; })[0];
+          if (la) wijzig(ru, [la], !la.on, null);
+        });
+        koppelSchuif(d.querySelector('input'), d.querySelector('.pct'), function(v){
+          var ru = vind(open), la = ru && ru.lamps.filter(function(x){ return x.id === l.id; })[0];
+          if (la) wijzig(ru, [la], null, v);
+        });
+        lijst.appendChild(d);
+      });
+    }
+    r.lamps.forEach(function(l, i){
+      var d = lijst.children[i];
+      d.classList.toggle('aan', l.on); d.classList.toggle('offline', !l.online);
+      d.querySelector('.ln').innerHTML = esc(l.name) + (l.online ? '' : '<small>offline</small>');
+      d.querySelector('.dim').style.display = l.bright == null ? 'none' : '';
+      zetSchuif(d.querySelector('input'), d.querySelector('.pct'), l.bright);
+    });
+  }
+  function sluitPaneel(){ open = null; $('paneel').classList.remove('open'); }
+  $('sluit').addEventListener('click', sluitPaneel);
+  $('paneel').addEventListener('click', function(e){ if (e.target === $('paneel')) sluitPaneel(); });
+
+  /* ---------- Alles uit ---------- */
+  $('allesUit').addEventListener('click', function(){
+    ruimtes.forEach(function(r){ if (aantalAan(r)) wijzig(r, r.lamps, false, null); });
+  });
+  // Lang indrukken op de titel: lijst met lampen/ruimtes opnieuw ophalen
+  (function(){
+    var t; var el = document.querySelector('.titel');
+    el.addEventListener('pointerdown', function(){ t = setTimeout(function(){ melding('Lampen opnieuw ophalen…'); haalStand(true); }, 900); });
+    ['pointerup','pointerleave','pointercancel'].forEach(function(n){ el.addEventListener(n, function(){ clearTimeout(t); }); });
+  })();
+
+  /* ---------- Demo ---------- */
+  function demoData(){
+    $('demo').hidden = false;
+    function L(id, name, on, b){ return { id:id, name:name, online:true, on:on, bright:b }; }
+    return [
+      { id:'woon', name:'Woonkamer', lamps:[L('w1','Plafond',true,80), L('w2','Staande lamp',true,60), L('w3','Lichtstrip tv',true,40)] },
+      { id:'keuken', name:'Keuken', lamps:[L('k1','Spots',true,100), L('k2','Eettafel',false,70)] },
+      { id:'slaap', name:'Slaapkamer', lamps:[L('s1','Plafond',false,50), L('s2','Nachtlampje',false,20)] },
+      { id:'gang', name:'Gang', lamps:[L('g1','Hal',false,100)] },
+      { id:'badkamer', name:'Badkamer', lamps:[L('b1','Spiegel',false,100), { id:'b2', name:'Plafond', online:false, on:false, bright:100 }] },
+      { id:'tuin', name:'Tuin', lamps:[L('t1','Lichtsnoer',true,30)] }
+    ];
+  }
+
+  /* ---------- Start ---------- */
+  addEventListener('resize', teken);
+  haalStand();
+  if (!DEMO) setInterval(haalStand, POLL);
+  // Elke 6 uur vers laden, zodat updates van de pagina vanzelf binnenkomen
+  setTimeout(function(){ location.reload(); }, 6 * 3600 * 1000);
+})();
+</script>
+</body>
+</html>
