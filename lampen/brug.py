@@ -355,6 +355,38 @@ def thermostaat_lus():
             log(f"thermostaat lezen: {e}")
 
 
+ZUIGER = None
+ZUIGER_STAND = {"ok": False, "fout": "niet gekoppeld"}
+
+
+def stofzuiger_lus():
+    """Optioneel: Eufy-robotstofzuiger (zie stofzuiger.py)."""
+    global ZUIGER, ZUIGER_STAND
+    if not CFG.get("eufy_email"):
+        return
+    try:
+        from stofzuiger import Stofzuiger
+    except Exception as e:
+        log(f"stofzuiger niet beschikbaar: {e}")
+        return
+    while ZUIGER is None:
+        try:
+            z = Stofzuiger(CFG, MAP, log)
+            z.verbind()
+            ZUIGER = z
+            log("stofzuiger verbonden: " + str(z.info.get("naam")))
+        except Exception as e:
+            ZUIGER_STAND = {"ok": False, "fout": str(e)}
+            log(f"stofzuiger: {e}")
+            time.sleep(1800)       # niet vaak opnieuw proberen: Eufy blokkeert bij te veel inlogpogingen
+    while True:
+        try:
+            ZUIGER_STAND = ZUIGER.stand()
+        except Exception as e:
+            log(f"stofzuiger lezen: {e}")
+        time.sleep(20)
+
+
 def meld_adres():
     """Vertelt de web-app op welk adres het dashboard de brug kan bereiken."""
     while True:
@@ -462,6 +494,15 @@ def verwerk(p):
         if p.get("graden") not in (None, ""):
             THERMO.zet(float(p["graden"]))
         return {"ok": True, "brug": True, "thermostaat": THERMO.stand or THERMO.lees()}
+    if actie == "stofzuiger":
+        global ZUIGER_STAND
+        if ZUIGER is None:
+            return {"ok": True, "brug": True, "stofzuiger": ZUIGER_STAND}
+        if p.get("opdracht"):
+            ZUIGER.opdracht(str(p["opdracht"]))
+            time.sleep(3)          # even wachten tot de stofzuiger zijn nieuwe stand meldt
+            ZUIGER_STAND = ZUIGER.stand()
+        return {"ok": True, "brug": True, "stofzuiger": ZUIGER_STAND}
     if actie in ("scene", "scenes", "agenda"):
         q = {"action": actie}
         if p.get("name"):
@@ -549,6 +590,7 @@ def main():
     threading.Thread(target=achtergrond, daemon=True).start()
     threading.Thread(target=meld_adres, daemon=True).start()
     threading.Thread(target=thermostaat_lus, daemon=True).start()
+    threading.Thread(target=stofzuiger_lus, daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", poort), Verzoek)
     log(f"brug luistert op 127.0.0.1:{poort}")
     server.serve_forever()
