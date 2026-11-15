@@ -62,6 +62,75 @@ def _nep_homeassistant():
     module("homeassistant.components.vacuum").VacuumActivity = VacuumActivity
 
 
+def _moderne_inlog(EufyApi):
+    """De opgehaalde code logt in op een manier die Eufy niet meer toelaat (antwoord: 403).
+    Dit vervangt alleen het inloggen: eerst via de nieuwe gezamenlijke Eufy-app, daarna
+    via de oude Eufy Clean-app, en kiest de inlog waarmee de stofzuigers op te vragen zijn."""
+    import aiohttp
+
+    manieren = [
+        ("nieuwe Eufy-app", "https://home-api.eufylife.com/v1/user/v2/email/login", "eufy-app", "8FHf22gaTKu7MZXqz5zytw", "Health"),
+        ("Eufy Clean-app", "https://home-api.eufylife.com/v1/user/email/login", "eufyhome-app", "GQCpr9dSp3uQpsOMgJ4xQ", "Home"),
+    ]
+
+    async def eufy_login(self):
+        self.inlog_verslag = []
+        reserve = None
+        async with aiohttp.ClientSession() as web:
+            for naam, url, client_id, client_secret, categorie in manieren:
+                try:
+                    async with web.post(
+                        url, timeout=aiohttp.ClientTimeout(total=30),
+                        headers={"category": categorie, "Accept": "*/*", "openudid": self.openudid,
+                                 "Content-Type": "application/json", "clientType": "1",
+                                 "User-Agent": "EufyHome-Android-3.1.3-753", "Connection": "keep-alive"},
+                        json={"email": self.username, "password": self.password,
+                              "client_id": client_id, "client_secret": client_secret},
+                    ) as antwoord:
+                        try:
+                            data = await antwoord.json(content_type=None)
+                        except Exception:
+                            data = None
+                        if antwoord.status == 200 and data and data.get("access_token"):
+                            self.session = data
+                            info = await self.get_user_info()
+                            if info and info.get("user_center_id"):
+                                self.inlog_verslag.append(f"{naam}: gelukt")
+                                return data
+                            self.inlog_verslag.append(f"{naam}: ingelogd, maar geen toegang tot de stofzuigerdienst")
+                            reserve = reserve or data
+                        else:
+                            melding = ""
+                            if isinstance(data, dict):
+                                melding = str(data.get("message") or data.get("msg") or data.get("res_code") or "")[:120]
+                            self.inlog_verslag.append(f"{naam}: geweigerd (status {antwoord.status}) {melding}".strip())
+                except Exception as e:
+                    self.inlog_verslag.append(f"{naam}: fout ({type(e).__name__})")
+        self.session = reserve
+        return reserve
+
+    oude_lijst = EufyApi.get_cloud_device_list
+
+    async def get_cloud_device_list(self):
+        apparaten = await oude_lijst(self)
+        if apparaten:
+            return apparaten
+        # Accounts in de nieuwe Eufy-app staan op een ander adres
+        async with aiohttp.ClientSession() as web:
+            async with web.get("https://home-api.eufylife.com/v1/device/", timeout=aiohttp.ClientTimeout(total=30),
+                               headers={"content-type": "application/json", "token": self.session["access_token"]}) as antwoord:
+                if antwoord.status != 200:
+                    return []
+                data = await antwoord.json(content_type=None)
+                lijst = data.get("devices", data.get("data", [])) if isinstance(data, dict) else []
+                if isinstance(lijst, dict):
+                    lijst = lijst.get("devices", [])
+                return lijst if isinstance(lijst, list) else []
+
+    EufyApi.eufy_login = eufy_login
+    EufyApi.get_cloud_device_list = get_cloud_device_list
+
+
 STAND_NL = {
     "cleaning": "Aan het zuigen", "docked": "In het station", "idle": "Stil",
     "paused": "Gepauzeerd", "returning": "Onderweg naar het station", "error": "Storing",
@@ -99,11 +168,19 @@ class Stofzuiger:
         _nep_homeassistant()
         if code not in sys.path:
             sys.path.insert(0, code)
+        from custom_components.robovac_mqtt.EufyApi import EufyApi
         from custom_components.robovac_mqtt.EufyClean import EufyClean
+        if not getattr(EufyApi, "_modern", False):
+            _moderne_inlog(EufyApi)
+            EufyApi._modern = True
 
         async def start():
             eufy = EufyClean(self.cfg["eufy_email"], self.cfg["eufy_wachtwoord"])
-            await eufy.init()
+            try:
+                await eufy.init()
+            except Exception as e:
+                verslag = getattr(getattr(eufy.eufyCleanApi, "eufyApi", None), "inlog_verslag", None)
+                raise RuntimeError("inloggen bij Eufy mislukt: " + ("; ".join(verslag) if verslag else str(e)))
             apparaten = await eufy.get_devices()
             self.apparaten = [{"id": d.get("deviceId"), "naam": d.get("deviceName"), "model": d.get("deviceModel"),
                                "modelnaam": d.get("deviceModelName"), "soort": d.get("apiType")} for d in apparaten]
