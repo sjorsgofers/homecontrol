@@ -63,7 +63,7 @@ function verwerk_(p) {
     if (p.action === 'scene') return { ok: true, scene: startScene_(p.name) };
     if (p.action === 'scenes') return { ok: true, scenes: scenes_().map(function (s) { return s.name; }) };
     if (p.action === 'refresh') {
-      CacheService.getScriptCache().removeAll(['apparaten', 'status', 'scenes', 'huizen']);
+      CacheService.getScriptCache().removeAll(['apparaten', 'status', 'scenes', 'huizen', 'codes']);
     }
     return { ok: true, ruimtes: stand_() };
   } catch (err) {
@@ -73,7 +73,7 @@ function verwerk_(p) {
 
 /* Handig om in de editor te draaien: logt wat er gevonden wordt. */
 function test() {
-  CacheService.getScriptCache().removeAll(['apparaten', 'status', 'tuya_token', 'scenes', 'huizen']);
+  CacheService.getScriptCache().removeAll(['apparaten', 'status', 'tuya_token', 'scenes', 'huizen', 'codes']);
   var r = stand_();
   r.forEach(function (ruimte) {
     Logger.log('== ' + ruimte.name + ' ==');
@@ -210,24 +210,45 @@ function status_(ids) {
     });
   }
   cache.put('status', JSON.stringify(uit), 15);
+  onthoudCodes_(uit);
   return uit;
+}
+
+/* Per lamp welke Tuya-codes hij gebruikt voor aan/uit en helderheid (6 uur gecachet),
+   zodat schakelen niet eerst de status van alle lampen hoeft op te halen. */
+function codes_() {
+  try { return JSON.parse(CacheService.getScriptCache().get('codes') || '{}'); } catch (e) { return {}; }
+}
+function onthoudCodes_(status) {
+  var codes = codes_();
+  Object.keys(status).forEach(function (id) {
+    var s = status[id], hc = eersteCode_(s, HELDER_CODES), oud = codes[id] || {};
+    var b = hc ? bereik_(hc, s[hc]) : null;
+    if (b && oud.bereik && oud.bereik[1] > b[1]) b = oud.bereik;
+    codes[id] = { aan: eersteCode_(s, AAN_CODES), helder: hc, bereik: b };
+  });
+  CacheService.getScriptCache().put('codes', JSON.stringify(codes), 21600);
+  return codes;
 }
 
 /* ---------------------------- schakelen ---------------------------- */
 
 function schakel_(ids, aan, helderProcent) {
-  var status = {};
-  try { status = status_(apparaten_().lampen.map(function (l) { return l.id; })); } catch (e) {}
+  /* De codes per lamp komen uit de cache; alleen als er een ontbreekt halen we de status op.
+     Dat scheelt bij elke tik een extra ronde naar Tuya. */
+  var codes = codes_();
+  if (ids.some(function (id) { return !codes[id]; })) {
+    try { codes = onthoudCodes_(status_(apparaten_().lampen.map(function (l) { return l.id; }))); } catch (e) {}
+  }
   var verzoeken = [];
   var volgorde = [];
   ids.forEach(function (id) {
-    var s = status[id] || {};
+    var c = codes[id] || {};
     var cmds = [];
-    if (aan !== null) cmds.push({ code: eersteCode_(s, AAN_CODES) || 'switch_led', value: aan });
+    if (aan !== null) cmds.push({ code: c.aan || 'switch_led', value: aan });
     if (helderProcent !== null && !isNaN(helderProcent)) {
-      var hc = eersteCode_(s, HELDER_CODES);
-      if (hc) cmds.push({ code: hc, value: vanProcent_(hc, s[hc], helderProcent) });
-      if (aan === null && helderProcent > 0) cmds.unshift({ code: eersteCode_(s, AAN_CODES) || 'switch_led', value: true });
+      if (c.helder) cmds.push({ code: c.helder, value: vanProcent_(c.bereik, helderProcent) });
+      if (aan === null && helderProcent > 0) cmds.unshift({ code: c.aan || 'switch_led', value: true });
     }
     if (!cmds.length) return;
     verzoeken.push(verzoek_('POST', '/v1.0/devices/' + id + '/commands', null, { commands: cmds }));
@@ -302,8 +323,8 @@ function naarProcent_(code, waarde) {
   var p = Math.round((Number(waarde) - b[0]) / (b[1] - b[0]) * 99) + 1;
   return Math.max(1, Math.min(100, p));
 }
-function vanProcent_(code, huidig, procent) {
-  var b = bereik_(code, huidig);
+function vanProcent_(b, procent) {
+  b = b || [10, 1000];
   var p = Math.max(1, Math.min(100, Number(procent)));
   return Math.round(b[0] + (p - 1) / 99 * (b[1] - b[0]));
 }
@@ -314,7 +335,12 @@ function eersteCode_(status, codes) {
 
 /* ------------------------- Tuya Cloud API ------------------------- */
 
-function prop_(naam) { return PropertiesService.getScriptProperties().getProperty(naam) || ''; }
+/* Alle scripteigenschappen in een keer lezen (per aanroep); dat is sneller dan stuk voor stuk. */
+var PROPS_ = null;
+function prop_(naam) {
+  if (!PROPS_) PROPS_ = PropertiesService.getScriptProperties().getProperties();
+  return PROPS_[naam] || '';
+}
 function host_() { return REGIO_HOSTS[(prop_('TUYA_REGIO') || 'eu').toLowerCase()] || REGIO_HOSTS.eu; }
 
 function hex_(bytes) {
@@ -362,6 +388,7 @@ function tuya_(methode, pad, query, body, poging) {
     /* 1010/1011 = token verlopen of ongeldig: één keer opnieuw proberen. */
     if ((j.code === 1010 || j.code === 1011) && !poging) {
       CacheService.getScriptCache().remove('tuya_token');
+      TOKEN_ = null;
       return tuya_(methode, pad, query, body, 1);
     }
     throw new Error('Tuya ' + pad + ': ' + (j.msg || j.code));
@@ -369,15 +396,18 @@ function tuya_(methode, pad, query, body, poging) {
   return j.result;
 }
 
+var TOKEN_ = null;
 function token_() {
+  if (TOKEN_) return TOKEN_;
   var cache = CacheService.getScriptCache();
   var c = cache.get('tuya_token');
-  if (c) return c;
+  if (c) { TOKEN_ = c; return c; }
   var opts = verzoek_('GET', '/v1.0/token', { grant_type: 1 }, null, true);
   var url = opts.url; delete opts.url;
   var j = JSON.parse(UrlFetchApp.fetch(url, opts).getContentText());
   if (!j.success) throw new Error('Tuya token: ' + (j.msg || j.code) + ' — controleer TUYA_ID, TUYA_SECRET en TUYA_REGIO');
   var duur = Math.max(60, Math.min(21600, (j.result.expire_time || 7200) - 120));
   cache.put('tuya_token', j.result.access_token, duur);
-  return j.result.access_token;
+  TOKEN_ = j.result.access_token;
+  return TOKEN_;
 }
