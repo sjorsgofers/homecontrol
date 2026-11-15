@@ -21,6 +21,28 @@ import sys
 import threading
 import time
 
+def _oudere_slixmpp():
+    """aionefit geeft 'ssl_context' mee, wat pas vanaf slixmpp 1.9.1 bestaat. Nieuwere
+    slixmpp heeft op Windows Rust nodig om te installeren; met 1.8.5 (puur Python) laten we
+    dat argument hier weg. De versleuteling blijft gewoon aan (standaardinstellingen)."""
+    import slixmpp
+    oud = slixmpp.ClientXMPP.__init__
+    if getattr(oud, "_aangepast", False):
+        return
+    try:
+        import inspect
+        if "ssl_context" in inspect.signature(slixmpp.xmlstream.XMLStream.__init__).parameters:
+            return
+    except Exception:
+        pass
+
+    def nieuw(self, *args, ssl_context=None, **kwargs):
+        oud(self, *args, **kwargs)
+
+    nieuw._aangepast = True
+    slixmpp.ClientXMPP.__init__ = nieuw
+
+
 PADEN = {
     "status": "/ecus/rrc/uiStatus",
     "buiten": "/system/sensors/temperatures/outdoor_t1",
@@ -53,6 +75,7 @@ class Thermostaat:
                 ev.set()
 
     async def _verbind(self):
+        _oudere_slixmpp()
         from aionefit import NefitCore
         fouten = []
 
