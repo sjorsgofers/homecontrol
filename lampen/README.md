@@ -111,19 +111,22 @@ De pagina werkt ook los van de Hub en van `lampen.py`, bijvoorbeeld op een iPad
 aan de muur. Hij staat online via GitHub Pages:
 
 ```
-https://sjorsgofers.github.io/homecontrol/lampen/#id=<IMPLEMENTATIE-ID>&key=<SLEUTEL>
+https://sjorsgofers.github.io/homecontrol/lampen/
 ```
 
-- `id` is het deel van de /exec-URL tussen `/s/` en `/exec`. Optioneel erachter:
-  `&lat=<breedtegraad>&lon=<lengtegraad>` voor het weer.
-- Zet deze gegevens achter `#` en niet achter `?`: wat achter `#` staat wordt niet
-  naar de webserver gestuurd. Zet de link met sleutel nooit in de repo.
-- Open de link in Safari en kies *Deel → Zet op beginscherm*. De pagina opent dan
-  schermvullend als app en onthoudt de koppeling.
+- Op een nieuw apparaat vraagt de pagina één keer om de **sleutel** (de `SLEUTEL`
+  uit de scripteigenschappen) en optioneel een plaats voor het weer. Die worden
+  alleen op dat apparaat bewaard. *Voorbeeld bekijken* toont voorbeeldlampen.
+- Het adres van het script staat in `index.html` (`API_URL`). Dat mag openbaar zijn:
+  zonder sleutel doet het script niets. **Zet de sleutel zelf nooit in de repo.**
+- Koppeling wijzigen: de datum lang indrukken.
+- Op het beginscherm zetten: in Safari *Deel → Zet op beginscherm*; de pagina opent
+  dan schermvullend als app. Koppel daarna in die app (hij heeft een eigen geheugen).
 - Scherm aan laten: *Instellingen → Beeldscherm en helderheid → Automatisch slot →
   Nooit*.
-
-Zonder gegevens in de link toont de pagina voorbeeldlampen (demo).
+- Koppelen kan ook met een link, bijvoorbeeld als QR-code:
+  `…/lampen/#id=<IMPLEMENTATIE-ID>&key=<SLEUTEL>&lat=<..>&lon=<..>`. Wat achter `#`
+  staat wordt niet naar de webserver gestuurd.
 
 ## Bedienen
 

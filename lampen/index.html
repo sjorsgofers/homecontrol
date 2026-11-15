@@ -283,7 +283,26 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
 #party.aan svg{stroke:var(--party-aan);animation:draai 7s linear infinite}
 #party.bezig svg{animation:puls 1s ease-in-out infinite}
 @keyframes draai{to{transform:rotate(360deg)}}
-#demo{position:fixed;right:12px;bottom:8px;font-size:11px;color:var(--faint);letter-spacing:.04em}
+#demo{appearance:none;-webkit-appearance:none;position:fixed;right:12px;bottom:10px;z-index:3;padding:7px 14px;border:0;
+  border-radius:999px;background:var(--vlak);box-shadow:3px 4px 10px var(--schaduw-d);font-size:13px;color:var(--muted);cursor:pointer}
+
+/* ---------- Koppelen: sleutel één keer per apparaat invullen ---------- */
+#koppel{position:fixed;left:0;top:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;justify-content:center;
+  padding:20px;background:var(--paneel-achter)}
+.kaart{width:420px;max-width:100%;padding:24px;border-radius:20px;background:var(--vel);color:var(--txt);font-size:16px;
+  box-shadow:8px 10px 28px var(--schaduw-d)}
+.kaart b{display:block;font-size:22px;font-weight:500}
+.kaart p{margin:8px 0 14px;color:var(--muted);line-height:1.4}
+.kaart label{display:block;margin-top:12px;font-size:14px;color:var(--muted)}
+.kaart input{display:block;width:100%;height:46px;margin-top:6px;padding:0 14px;border:1px solid var(--lijn);border-radius:12px;
+  background:var(--lamp-bg);color:var(--txt);font:inherit;font-size:17px;outline:none;-webkit-user-select:text;user-select:text}
+.kaart input:focus{border-color:var(--accent)}
+.kaart .fout{min-height:20px;margin-top:10px;font-size:14px;color:var(--rood)}
+.kaart .knoppen{display:flex;justify-content:space-between;margin-top:10px}
+.kaart button{appearance:none;-webkit-appearance:none;height:46px;padding:0 20px;border:0;border-radius:12px;background:transparent;
+  font-size:16px;color:var(--muted);cursor:pointer}
+.kaart button[type=submit]{background:var(--accent-grad);color:var(--accent-ink);font-weight:500}
+.kaart button:disabled{opacity:.5}
 
 /* ---------- Staand scherm: klok boven, plattegrond onder; alles blijft in beeld ---------- */
 .staand #app{flex-direction:column;justify-content:space-between}
@@ -324,15 +343,35 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
   </div>
 </div>
 <div id="melding"></div>
-<div id="demo" hidden>DEMO · nog niet gekoppeld</div>
+<button id="demo" hidden>Voorbeeld · tik om te koppelen</button>
+
+<div id="koppel" hidden>
+  <form class="kaart" id="koppelForm">
+    <b>Dit apparaat koppelen</b>
+    <p>Vul één keer je sleutel in. Hij wordt alleen op dit apparaat bewaard.</p>
+    <label>Sleutel
+      <input id="koppelSleutel" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </label>
+    <label>Plaats voor het weer (optioneel)
+      <input id="koppelPlaats" type="text" autocomplete="off" autocorrect="off" spellcheck="false">
+    </label>
+    <div class="fout" id="koppelFout"></div>
+    <div class="knoppen">
+      <button type="button" id="koppelDemo">Voorbeeld bekijken</button>
+      <button type="submit" id="koppelOk">Koppelen</button>
+    </div>
+  </form>
+</div>
 
 <script>
 (function(){
   /* ---------- Instellingen ----------
-     Geef de /exec-URL van apps-script.gs en de sleutel mee in de URL:
+     API_URL is de /exec-URL van apps-script.gs. Die mag openbaar zijn: zonder de sleutel
+     doet het script niets. De SLEUTEL hoort hier NOOIT te staan; die vult de gebruiker
+     één keer per apparaat in (koppelscherm) of komt uit de link:
      ?api=<exec-url>&key=<SLEUTEL>  (lampen.py doet dat vanzelf).
      Optioneel voor het weer: &lat=<breedtegraad>&lon=<lengtegraad>. */
-  var API_URL = '';
+  var API_URL = 'https://script.google.com/macros/s/AKfycbzsy18kfT-GvO7TcohgXac7oNoJvII6xCuPVNuaOXrgCYJDRBLSG334Mv4da4O8PxliwA/exec';
 
   /* ---------- Scènes ----------
      Het discobolletje naast het weer start de scène 'party'; nog een keer drukken start
@@ -554,6 +593,7 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
       teken();
       meld('geladen: gekoppeld, ' + ruimtes.length + ' ruimtes, ' + innerWidth + 'x' + innerHeight);
     }).catch(function(e){
+      if (String(e.message) === 'Onjuiste sleutel') { toonKoppelen('De sleutel op dit apparaat klopt niet.'); return; }
       meld('fout bij ophalen: ' + (e.message || e));
       stip('fout', String(e.message || e));
       melding((ruimtes.length ? 'Geen verbinding: ' : 'Kan de lampen niet bereiken: ') + (e.message || e));
@@ -898,6 +938,53 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     toon();
   })();
 
+  /* ---------- Koppelen ----------
+     Het adres van het script staat in de pagina (API_URL) of komt uit de link; de sleutel
+     vult de gebruiker één keer per apparaat in. Hij staat daarna alleen in dat apparaat. */
+  function toonKoppelen(fout){
+    $('koppelFout').textContent = fout || '';
+    $('koppel').hidden = false;
+  }
+  function zoekPlaats(naam){
+    return fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=nl&name=' + encodeURIComponent(naam))
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var p = j && j.results && j.results[0];
+        if (!p) throw new Error('De plaats "' + naam + '" is niet gevonden.');
+        return p;
+      });
+  }
+  $('koppelForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var sleutel = $('koppelSleutel').value.trim(), plaats = $('koppelPlaats').value.trim();
+    if (!API) { $('koppelFout').textContent = 'Deze pagina kent het adres van het script nog niet.'; return; }
+    if (!sleutel) { $('koppelFout').textContent = 'Vul de sleutel in.'; return; }
+    $('koppelOk').disabled = true; $('koppelFout').textContent = 'Bezig…';
+    var url = API + (API.indexOf('?') >= 0 ? '&' : '?') + 'action=state&key=' + encodeURIComponent(sleutel) + '&_=' + Date.now();
+    fetch(url, { cache:'no-store' }).then(function(r){ return r.json(); }).then(function(j){
+      if (!j.ok) throw new Error(j.fout === 'Onjuiste sleutel' ? 'De sleutel klopt niet.' : (j.fout || 'Onbekende fout'));
+      return plaats ? zoekPlaats(plaats) : null;
+    }).then(function(p){
+      KEY = bewaar('key', sleutel);
+      if (p) { LAT = bewaar('lat', p.latitude.toFixed(2)); LON = bewaar('lon', p.longitude.toFixed(2)); }
+      DEMO = false;
+      $('koppel').hidden = true; $('demo').hidden = true; $('koppelSleutel').value = '';
+      if (!LAT || !LON) $('weer').hidden = true;
+      ruimtes = [];
+      haalStand(); weer();
+    }).catch(function(err){
+      $('koppelFout').textContent = err.message || String(err);
+    }).then(function(){ $('koppelOk').disabled = false; });
+  });
+  $('koppelDemo').addEventListener('click', function(){ DEMO = true; $('koppel').hidden = true; haalStand(); });
+  $('demo').addEventListener('click', function(){ toonKoppelen(); });
+  // Lang indrukken op de datum: koppeling van dit apparaat wijzigen
+  (function(){
+    var t; var el = $('datum').parentNode;
+    el.addEventListener('pointerdown', function(){ t = setTimeout(function(){ toonKoppelen(); }, 900); });
+    ['pointerup','pointerleave','pointercancel'].forEach(function(n){ el.addEventListener(n, function(){ clearTimeout(t); }); });
+  })();
+
   // Lang indrukken op de klok: lijst met lampen/ruimtes opnieuw ophalen
   (function(){
     var t; var el = $('klok');
@@ -924,8 +1011,9 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
   bouwPlan();
   addEventListener('resize', maat);
   addEventListener('orientationchange', pasAan);
-  haalStand();
-  if (!DEMO) setInterval(haalStand, POLL);
+  // Nog geen sleutel op dit apparaat: eerst koppelen (of het voorbeeld bekijken)
+  if (!DEMO && !KEY) toonKoppelen(); else haalStand();
+  setInterval(function(){ if (!DEMO && KEY) haalStand(); }, POLL);
   weer(); setInterval(weer, 15 * 60 * 1000);
   // Tablet of telefoon die weer wakker wordt: meteen de actuele stand en tijd tonen
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) { klok(); if (!DEMO) haalStand(); } });
