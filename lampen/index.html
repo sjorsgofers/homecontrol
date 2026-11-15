@@ -231,6 +231,32 @@ input[type=range]::-moz-range-progress{height:12px;border-radius:999px;backgroun
 input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#fff;border:3px solid var(--accent)}
 input[type=range]:disabled{opacity:.35}
 
+/* Warm/koud wit en kleur in het paneel */
+.lamp .wit{flex:0 0 100%;display:flex;align-items:center;padding-right:54px}
+input[type=range].warm::-webkit-slider-runnable-track{background:linear-gradient(90deg,#ffb25a 0%,#fff1dc 50%,#cfe3ff 100%)}
+input[type=range].warm::-moz-range-track{background:linear-gradient(90deg,#ffb25a 0%,#fff1dc 50%,#cfe3ff 100%)}
+input[type=range].warm::-moz-range-progress{background:transparent}
+.lamp .kleuren{flex:0 0 100%;display:flex;flex-wrap:wrap;margin-top:6px}
+.kl{appearance:none;-webkit-appearance:none;width:34px;height:34px;margin:0 10px 6px 0;padding:0;border-radius:50%;cursor:pointer;
+  border:3px solid transparent;box-shadow:0 1px 4px var(--knop-d);transition:transform .15s}
+.kl:active{transform:scale(.9)}
+.kl.actief{border-color:var(--txt)}
+
+/* ---------- Thermostaat: temperatuur met een knopje omlaag en omhoog ---------- */
+.thermo{display:flex;align-items:center;margin-top:calc(var(--s)*14);padding:calc(var(--s)*8) calc(var(--s)*10) calc(var(--s)*8) calc(var(--s)*18);
+  border-radius:calc(var(--s)*16);background:var(--vlak);box-shadow:var(--schaduw)}
+.thermo.voorbeeld{opacity:.6}
+.th-nu{display:flex;flex-direction:column;margin-right:calc(var(--s)*18);white-space:nowrap}
+.th-nu b{font-size:calc(var(--s)*34);font-weight:400;line-height:1.05;font-variant-numeric:tabular-nums}
+.th-nu small{margin-top:calc(var(--s)*2);font-size:calc(var(--s)*13);color:var(--muted)}
+.th-zet{display:flex;align-items:center}
+.th-zet span{min-width:calc(var(--s)*62);text-align:center;font-size:calc(var(--s)*21);font-variant-numeric:tabular-nums}
+.th-knop{appearance:none;-webkit-appearance:none;width:calc(var(--s)*42);height:calc(var(--s)*42);padding:0;border:0;border-radius:50%;
+  background:var(--knop-bg);box-shadow:calc(var(--s)*2) calc(var(--s)*3) calc(var(--s)*7) var(--knop-d),calc(var(--s)*-2) calc(var(--s)*-2) calc(var(--s)*5) var(--knop-l);
+  font-size:calc(var(--s)*26);line-height:1;color:var(--txt);cursor:pointer}
+.th-knop:active{transform:scale(.92)}
+.thermo.stookt .th-nu b{color:var(--accent-tekst)}
+
 /* ---------- Meldingen ---------- */
 #melding{position:fixed;left:50%;bottom:18px;z-index:30;max-width:90vw;padding:12px 20px;border-radius:14px;
   transform:translate(-50%,20px);opacity:0;pointer-events:none;text-align:center;font-size:16px;
@@ -329,6 +355,14 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     </div>
     <div class="datum"><span id="datum"></span><span class="stip" id="stip"></span></div>
     <div id="agenda"></div>
+    <div class="thermo" id="thermo">
+      <div class="th-nu"><b id="thNu">–</b><small id="thSub"></small></div>
+      <div class="th-zet">
+        <button class="th-knop" id="thOmlaag" aria-label="Temperatuur lager">−</button>
+        <span id="thDoel">–</span>
+        <button class="th-knop" id="thOmhoog" aria-label="Temperatuur hoger">+</button>
+      </div>
+    </div>
     <div class="onder">
       <div id="overig"></div>
       <div class="rij">
@@ -469,7 +503,7 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     var uit = { links: 1, geheel: 1 };
     if (staand) uit.geheel = app.scrollHeight / app.clientHeight;
     else uit.links = links.scrollHeight / links.clientHeight;
-    [$('klok').parentNode, $('datum').parentNode, $('overig'), $('allesUit').parentNode].forEach(function(el){
+    [$('klok').parentNode, $('datum').parentNode, $('thermo'), $('overig'), $('allesUit').parentNode].forEach(function(el){
       var r = el.getBoundingClientRect();
       if (!r.width) return;
       var grens = W - rand;
@@ -645,11 +679,13 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     });
   }
 
-  function stuur(ruimteId, ids, aan, helder){
+  function stuur(ruimteId, ids, aan, helder, extra){
     if (DEMO) return new Promise(function(ok){ setTimeout(ok, 350); });
     var body = { action: 'set', ids: ids };
     if (aan !== null) body.on = aan;
     if (helder !== null) body.bright = helder;
+    if (extra && extra.temp != null) body.temp = extra.temp;
+    if (extra && extra.kleur != null) body.kleur = extra.kleur;
     return vraag(body).then(function(j){
       if (!j.ok) throw new Error(j.fout || 'Onbekende fout');
       var mis = (j.resultaat || []).filter(function(x){ return !x.ok; });
@@ -659,17 +695,23 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
   }
 
   /* Voert een wijziging direct zichtbaar door, stuurt hem en haalt daarna de echte stand op. */
-  function wijzig(r, lampen, aan, helder){
+  /* extra (optioneel): { temp: 0-100 } voor warm (0) tot koud (100) wit, of { kleur: 0-360 } voor een kleurtoon.
+     Alleen lampen die dat kunnen doen mee. */
+  function wijzig(r, lampen, aan, helder, extra){
+    if (extra && extra.temp != null) lampen = lampen.filter(function(l){ return l.temp != null; });
+    if (extra && extra.kleur != null) lampen = lampen.filter(function(l){ return l.rgb; });
     var ids = lampen.filter(function(l){ return l.online; }).map(function(l){ return l.id; });
     if (!ids.length) { melding('Geen lampen online in ' + r.name); return; }
     lampen.forEach(function(l){
       if (!l.online) return;
       if (aan !== null) l.on = aan;
       if (helder !== null) { l.bright = helder; l.on = true; }
+      if (extra && extra.temp != null) { l.temp = extra.temp; l.tint = null; l.on = true; }
+      if (extra && extra.kleur != null) { l.tint = extra.kleur; l.on = true; }
     });
     bezig[r.id] = (bezig[r.id] || 0) + 1;
     teken();
-    stuur(r.id, ids, aan, helder).catch(function(e){ melding('Mislukt: ' + (e.message || e)); })
+    stuur(r.id, ids, aan, helder, extra).catch(function(e){ melding('Mislukt: ' + (e.message || e)); })
       .then(function(){
         bezig[r.id]--; if (!bezig[r.id]) delete bezig[r.id];
         clearTimeout(bijwerkTimer);
@@ -890,6 +932,41 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
 
   /* ---------- Paneel: hele ruimte + losse lampen ---------- */
   var RIJ = '<div class="dim"><input type="range" min="1" max="100" step="1"><span class="pct"></span></div>';
+  /* Warm/koud wit (schuif) en kleur (rondjes); alleen zichtbaar bij lampen die het kunnen. */
+  var KLEUREN = [0, 28, 52, 120, 175, 225, 270, 320];
+  var TINT = '<div class="wit"><input class="warm" type="range" min="0" max="100" step="1" aria-label="Warm of koud wit"></div>' +
+    '<div class="kleuren">' + KLEUREN.map(function(h){
+      return '<button class="kl" data-h="' + h + '" style="background:hsl(' + h + ',85%,55%)" aria-label="Kleur"></button>';
+    }).join('') + '</div>';
+  /* Koppelt de schuif en de kleurrondjes van één blok; 'wie' geeft de ruimte en de lampen waar het om gaat. */
+  function koppelTint(blok, wie){
+    var warm = blok.querySelector('.warm');
+    warm.addEventListener('input', function(){ warm.dataset.sleept = '1'; });
+    warm.addEventListener('change', function(){
+      delete warm.dataset.sleept;
+      var w = wie(); if (w) wijzig(w.ruimte, w.lampen, null, null, { temp: Number(warm.value) });
+    });
+    Array.prototype.forEach.call(blok.querySelectorAll('.kl'), function(k){
+      k.addEventListener('click', function(){
+        var w = wie(); if (w) wijzig(w.ruimte, w.lampen, null, null, { kleur: Number(k.dataset.h) });
+      });
+    });
+  }
+  function toonTint(blok, lampen){
+    var metTemp = lampen.filter(function(l){ return l.temp != null; });
+    var metKleur = lampen.filter(function(l){ return l.rgb; });
+    var warm = blok.querySelector('.warm');
+    blok.querySelector('.wit').style.display = metTemp.length ? '' : 'none';
+    blok.querySelector('.kleuren').style.display = metKleur.length ? '' : 'none';
+    if (metTemp.length && !warm.dataset.sleept) {
+      warm.value = Math.round(metTemp.reduce(function(s, l){ return s + l.temp; }, 0) / metTemp.length);
+    }
+    var tint = metKleur.length && metKleur.every(function(l){ return l.tint != null && l.on; }) ? metKleur[0].tint : null;
+    Array.prototype.forEach.call(blok.querySelectorAll('.kl'), function(k){
+      var d = tint == null ? 999 : Math.abs(Number(k.dataset.h) - tint); d = Math.min(d, 360 - d);
+      k.classList.toggle('actief', d <= 14);
+    });
+  }
   function tekenPaneel(){
     var r = vind(open); if (!r) { sluitPaneel(); return; }
     $('velNaam').textContent = r.name;
@@ -898,14 +975,19 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     if (lijst.dataset.ruimte !== r.id || lijst.children.length !== r.lamps.length + 1) {
       lijst.dataset.ruimte = r.id; lijst.innerHTML = '';
       var g = document.createElement('div'); g.className = 'lamp geheel';
-      g.innerHTML = '<div class="ln">Hele ruimte</div>' + RIJ;
+      g.innerHTML = '<div class="ln">Hele ruimte</div>' + RIJ + TINT;
       koppelSchuif(g.querySelector('input'), g.querySelector('.pct'), function(v){
         var ru = vind(open); if (ru) wijzig(ru, ru.lamps, null, v);
       });
+      koppelTint(g, function(){ var ru = vind(open); return ru && { ruimte: ru, lampen: ru.lamps }; });
       lijst.appendChild(g);
       r.lamps.forEach(function(l){
         var d = document.createElement('div'); d.className = 'lamp'; d.dataset.id = l.id;
-        d.innerHTML = '<div class="ln"></div><button class="schakel" aria-label="Aan/uit"></button>' + RIJ;
+        d.innerHTML = '<div class="ln"></div><button class="schakel" aria-label="Aan/uit"></button>' + RIJ + TINT;
+        koppelTint(d, function(){
+          var ru = vind(open), la = ru && ru.lamps.filter(function(x){ return x.id === l.id; })[0];
+          return la && { ruimte: ru, lampen: [la] };
+        });
         d.querySelector('.schakel').addEventListener('click', function(){
           var ru = vind(open), la = ru && ru.lamps.filter(function(x){ return x.id === l.id; })[0];
           if (la) wijzig(ru, [la], !la.on, null);
@@ -920,12 +1002,14 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     var geheel = lijst.children[0], h = gemHelder(r);
     geheel.style.display = h == null ? 'none' : '';
     zetSchuif(geheel.querySelector('input'), geheel.querySelector('.pct'), h);
+    toonTint(geheel, r.lamps);
     r.lamps.forEach(function(l, i){
       var d = lijst.children[i + 1];
       d.classList.toggle('aan', l.on); d.classList.toggle('offline', !l.online);
       d.querySelector('.ln').innerHTML = esc(l.name) + (l.online ? '' : '<small>offline</small>');
       d.querySelector('.dim').style.display = l.bright == null ? 'none' : '';
       zetSchuif(d.querySelector('input'), d.querySelector('.pct'), l.bright);
+      toonTint(d, [l]);
     });
   }
   function sluitPaneel(){ open = null; $('paneel').classList.remove('open'); }
@@ -1035,6 +1119,42 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     ];
   }
 
+  /* ---------- Thermostaat (via de brug thuis; zie thermostaat.py) ----------
+     Toont de kamertemperatuur en de ingestelde temperatuur, met een knopje omlaag en omhoog
+     (halve graden). Zolang er geen thermostaat gekoppeld is, staan er voorbeeldwaarden. */
+  var thermo = null, thermoTimer = null;
+  function graden(x){ return x == null ? '–' : String(Math.round(x * 10) / 10).replace('.', ',') + '°'; }
+  function tekenThermo(){
+    var el = $('thermo'), t = thermo || { binnen: 20.5, ingesteld: 21, voorbeeld: true };
+    el.classList.toggle('voorbeeld', !!t.voorbeeld);
+    el.classList.toggle('stookt', !!t.stookt);
+    $('thNu').textContent = graden(t.binnen);
+    $('thDoel').textContent = graden(t.ingesteld);
+    $('thSub').textContent = t.voorbeeld ? 'voorbeeld' : t.stookt ? 'verwarmt' : 'binnen';
+  }
+  function haalThermo(){
+    if (DEMO || !KEY) { tekenThermo(); return; }
+    vraag({ action: 'thermostaat' }).then(function(j){
+      if (j && j.thermostaat && j.thermostaat.ok) thermo = j.thermostaat;
+      tekenThermo();
+    }).catch(function(){ tekenThermo(); });
+  }
+  function thermoStap(stap){
+    var t = thermo || (thermo = { binnen: 20.5, ingesteld: 21, voorbeeld: true });
+    t.ingesteld = Math.max(5, Math.min(30, Math.round(((t.ingesteld == null ? 20 : t.ingesteld) + stap) * 2) / 2));
+    tekenThermo();
+    if (t.voorbeeld) return;
+    clearTimeout(thermoTimer);   // even wachten: een paar keer tikken wordt één opdracht
+    thermoTimer = setTimeout(function(){
+      vraag({ action: 'thermostaat', graden: t.ingesteld }).then(function(j){
+        if (j && j.thermostaat && j.thermostaat.ok) { thermo = j.thermostaat; tekenThermo(); }
+        else melding('Thermostaat instellen is niet gelukt');
+      }).catch(function(){ melding('Thermostaat instellen is niet gelukt'); });
+    }, 900);
+  }
+  $('thOmlaag').addEventListener('click', function(){ thermoStap(-0.5); });
+  $('thOmhoog').addEventListener('click', function(){ thermoStap(0.5); });
+
   /* ---------- Koppelen ----------
      Het adres van het script staat in de pagina (API_URL) of komt uit de link; de sleutel
      vult de gebruiker één keer per apparaat in. Hij staat daarna alleen in dat apparaat. */
@@ -1093,7 +1213,7 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
   function demoData(){
     $('demo').hidden = false;
     if (!LAT || !LON) toonWeer(12, 2, 1);
-    function L(id, name, on, b){ return { id:id, name:name, online:true, on:on, bright:b }; }
+    function L(id, name, on, b){ return { id:id, name:name, online:true, on:on, bright:b, temp: b == null ? null : 35, rgb: b != null, tint: null }; }
     return [
       { id:'slaap', name:'Slaapkamer', lamps:[L('s1','Plafond',true,100), L('s2','Nachtlampje',true,60)] },
       { id:'hal', name:'Hal', lamps:[L('h1','Plafond',false,100)] },
@@ -1116,6 +1236,7 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
   }, 10000);
   weer(); setInterval(weer, 15 * 60 * 1000);
   haalAgenda(); setInterval(haalAgenda, 10 * 60 * 1000);
+  haalThermo(); setInterval(haalThermo, 60 * 1000);
   setInterval(tekenAgenda, 60 * 1000);   // afgelopen afspraken laten verdwijnen
   // Tablet of telefoon die weer wakker wordt: meteen de actuele stand en tijd tonen
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) { klok(); if (!DEMO) { haalStand(); haalAgenda(); } } });

@@ -31,6 +31,8 @@ var REGIO_HOSTS = {
 var LAMP_CATEGORIEEN = ['dj', 'dd', 'xdd', 'fwd', 'dc', 'fsd', 'tgq', 'tgkg', 'kg', 'cz', 'pc', 'tyndj', 'gyd', 'sxd'];
 var AAN_CODES = ['switch_led', 'switch_1', 'switch'];
 var HELDER_CODES = ['bright_value_v2', 'bright_value', 'bright_value_1'];
+var TEMP_CODES = ['temp_value_v2', 'temp_value'];      /* warm (0) tot koud (1000) wit */
+var KLEUR_CODES = ['colour_data_v2', 'colour_data'];   /* kleur als {h, s, v} */
 
 /* ---------------------------- web-app ---------------------------- */
 
@@ -56,7 +58,9 @@ function verwerk_(p) {
       if (typeof ids === 'string') ids = ids.split(',');
       var aan = p.on === undefined || p.on === '' ? null : (p.on === true || p.on === 'true' || p.on === '1');
       var helder = p.bright === undefined || p.bright === '' ? null : Number(p.bright);
-      var res = schakel_(ids || [], aan, helder);
+      var temp = p.temp === undefined || p.temp === '' ? null : Number(p.temp);       /* 0 = warm, 100 = koud */
+      var kleur = p.kleur === undefined || p.kleur === '' ? null : Number(p.kleur);   /* kleurtoon 0-360 */
+      var res = schakel_(ids || [], aan, helder, temp, kleur);
       CacheService.getScriptCache().remove('status');
       return { ok: true, resultaat: res };
     }
@@ -70,7 +74,7 @@ function verwerk_(p) {
     if (p.action === 'scene') return { ok: true, scene: startScene_(p.name) };
     if (p.action === 'scenes') return { ok: true, scenes: scenes_().map(function (s) { return s.name; }) };
     if (p.action === 'refresh') {
-      CacheService.getScriptCache().removeAll(['apparaten', 'status', 'scenes', 'huizen', 'codes']);
+      CacheService.getScriptCache().removeAll(['apparaten', 'status', 'scenes', 'huizen', 'codes2']);
     }
     return { ok: true, ruimtes: stand_(), brug: prop_('BRUG') };
   } catch (err) {
@@ -80,7 +84,7 @@ function verwerk_(p) {
 
 /* Handig om in de editor te draaien: logt wat er gevonden wordt. */
 function test() {
-  CacheService.getScriptCache().removeAll(['apparaten', 'status', 'tuya_token', 'scenes', 'huizen', 'codes']);
+  CacheService.getScriptCache().removeAll(['apparaten', 'status', 'tuya_token', 'scenes', 'huizen', 'codes2']);
   var r = stand_();
   r.forEach(function (ruimte) {
     Logger.log('== ' + ruimte.name + ' ==');
@@ -106,12 +110,17 @@ function stand_() {
     var s = status[l.id] || {};
     var aanCode = eersteCode_(s, AAN_CODES);
     var helderCode = eersteCode_(s, HELDER_CODES);
+    var tempCode = eersteCode_(s, TEMP_CODES);
+    var kleurCode = eersteCode_(s, KLEUR_CODES);
     lampInfo[l.id] = {
       id: l.id,
       name: l.name,
       online: l.online,
       on: aanCode ? s[aanCode] === true : false,
-      bright: helderCode ? naarProcent_(helderCode, s[helderCode]) : null
+      bright: helderCode ? naarProcent_(helderCode, s[helderCode]) : null,
+      temp: tempCode ? Math.max(0, Math.min(100, Math.round(Number(s[tempCode]) / 10))) : null,
+      rgb: !!kleurCode,
+      tint: kleurCode && s.work_mode === 'colour' ? tint_(s[kleurCode]) : null
     };
   });
 
@@ -224,7 +233,7 @@ function status_(ids) {
 /* Per lamp welke Tuya-codes hij gebruikt voor aan/uit en helderheid (6 uur gecachet),
    zodat schakelen niet eerst de status van alle lampen hoeft op te halen. */
 function codes_() {
-  try { return JSON.parse(CacheService.getScriptCache().get('codes') || '{}'); } catch (e) { return {}; }
+  try { return JSON.parse(CacheService.getScriptCache().get('codes2') || '{}'); } catch (e) { return {}; }
 }
 function onthoudCodes_(status) {
   var codes = codes_();
@@ -232,15 +241,18 @@ function onthoudCodes_(status) {
     var s = status[id], hc = eersteCode_(s, HELDER_CODES), oud = codes[id] || {};
     var b = hc ? bereik_(hc, s[hc]) : null;
     if (b && oud.bereik && oud.bereik[1] > b[1]) b = oud.bereik;
-    codes[id] = { aan: eersteCode_(s, AAN_CODES), helder: hc, bereik: b };
+    codes[id] = { aan: eersteCode_(s, AAN_CODES), helder: hc, bereik: b,
+                  temp: eersteCode_(s, TEMP_CODES), kleur: eersteCode_(s, KLEUR_CODES) };
   });
-  CacheService.getScriptCache().put('codes', JSON.stringify(codes), 21600);
+  CacheService.getScriptCache().put('codes2', JSON.stringify(codes), 21600);
   return codes;
 }
 
 /* ---------------------------- schakelen ---------------------------- */
 
-function schakel_(ids, aan, helderProcent) {
+function schakel_(ids, aan, helderProcent, temp, kleur) {
+  if (temp === undefined) temp = null;
+  if (kleur === undefined) kleur = null;
   /* De codes per lamp komen uit de cache; alleen als er een ontbreekt halen we de status op.
      Dat scheelt bij elke tik een extra ronde naar Tuya. */
   var codes = codes_();
@@ -256,6 +268,17 @@ function schakel_(ids, aan, helderProcent) {
     if (helderProcent !== null && !isNaN(helderProcent)) {
       if (c.helder) cmds.push({ code: c.helder, value: vanProcent_(c.bereik, helderProcent) });
       if (aan === null && helderProcent > 0) cmds.unshift({ code: c.aan || 'switch_led', value: true });
+    }
+    if (temp !== null && !isNaN(temp) && c.temp) {
+      cmds.push({ code: 'work_mode', value: 'white' });
+      cmds.push({ code: c.temp, value: Math.round(Math.max(0, Math.min(100, temp)) * 10) });
+    } else if (kleur !== null && !isNaN(kleur) && c.kleur) {
+      cmds.push({ code: 'work_mode', value: 'colour' });
+      cmds.push({ code: c.kleur, value: { h: Math.round(kleur) % 360, s: 1000, v: 1000 } });
+    }
+    var aanCode = c.aan || 'switch_led';
+    if (aan === null && cmds.length && !cmds.some(function (x) { return x.code === aanCode; })) {
+      cmds.unshift({ code: aanCode, value: true });
     }
     if (!cmds.length) return;
     verzoeken.push(verzoek_('POST', '/v1.0/devices/' + id + '/commands', null, { commands: cmds }));
@@ -383,6 +406,12 @@ function vanProcent_(b, procent) {
   b = b || [10, 1000];
   var p = Math.max(1, Math.min(100, Number(procent)));
   return Math.round(b[0] + (p - 1) / 99 * (b[1] - b[0]));
+}
+function tint_(waarde) {
+  try {
+    var o = typeof waarde === 'string' ? JSON.parse(waarde) : waarde;
+    return isNaN(Number(o.h)) ? null : Number(o.h);
+  } catch (e) { return null; }
 }
 function eersteCode_(status, codes) {
   for (var i = 0; i < codes.length; i++) if (status.hasOwnProperty(codes[i])) return codes[i];

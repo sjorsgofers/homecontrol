@@ -42,6 +42,8 @@ import tinytuya
 
 AAN_CODES = ["switch_led", "switch_1", "switch"]
 HELDER_CODES = ["bright_value_v2", "bright_value", "bright_value_1"]
+TEMP_CODES = ["temp_value_v2", "temp_value"]
+KLEUR_CODES = ["colour_data_v2", "colour_data"]
 PEIL_ELKE = 5            # seconden tussen statusrondes langs de lampen
 CLOUD_ELKE = 600         # seconden tussen het verversen van de indeling via de web-app
 ZOEK_ELKE = 300          # seconden tussen zoekrondes naar lampen zonder (werkend) adres
@@ -86,6 +88,16 @@ class Lamp:
         self.dp_helder = next((str(dps[c]) for c in HELDER_CODES if c in dps), None)
         # Nieuwe lampen (dp 22) lopen van 10 tot 1000, oude (dp 2/3) van 25 tot 255
         self.bereik = (10, 1000) if self.dp_helder and int(self.dp_helder) >= 20 else (25, 255)
+        # Warm/koud wit en kleur (alleen de nieuwe soort lampen: dp 21, 23 en 24)
+        self.dp_modus = str(dps["work_mode"]) if "work_mode" in dps else None
+        self.dp_temp = next((str(dps[c]) for c in TEMP_CODES if c in dps), None)
+        self.dp_kleur = next((str(dps[c]) for c in KLEUR_CODES if c in dps), None)
+        if not self.dp_modus or (self.dp_kleur and self.dp_kleur != "24"):
+            self.dp_kleur = None
+        self.modus = None
+        self.temp = None         # procent: 0 = warm, 100 = koud
+        self.tint = None         # kleurtoon 0-360 als de lamp op kleur staat
+        self.hsv = None
         self.ip = None
         self.versie = None
         self.dev = None
@@ -122,6 +134,22 @@ class Lamp:
             self.aan = bool(dps[self.dp_aan])
         if self.dp_helder and self.dp_helder in dps:
             self.helder = self.naar_procent(dps[self.dp_helder])
+        if self.dp_modus and self.dp_modus in dps:
+            self.modus = dps[self.dp_modus]
+        if self.dp_temp and self.dp_temp in dps:
+            try:
+                self.temp = max(0, min(100, round(float(dps[self.dp_temp]) / 10)))
+            except (TypeError, ValueError):
+                pass
+        if self.dp_kleur and self.dp_kleur in dps:
+            try:
+                k = str(dps[self.dp_kleur])
+                self.hsv = (int(k[0:4], 16), int(k[4:8], 16), int(k[8:12], 16))
+            except (TypeError, ValueError):
+                pass
+        self.tint = self.hsv[0] if (self.modus == "colour" and self.hsv) else None
+        if self.modus == "colour" and self.hsv:
+            self.helder = max(1, min(100, round(self.hsv[2] / 10)))   # in kleur is de helderheid de v-waarde
         return True
 
     def _mislukt(self):
@@ -149,18 +177,32 @@ class Lamp:
             except Exception:
                 self._mislukt()
 
-    def zet(self, aan, helder):
+    @staticmethod
+    def _kleurcode(h, s, v):
+        return "%04x%04x%04x" % (int(h) % 360, max(0, min(1000, int(s))), max(10, min(1000, int(v))))
+
+    def zet(self, aan, helder, temp=None, kleur=None):
         """Schakelt de lamp rechtstreeks. Geeft True als dat gelukt is."""
         if not self.lokaal:
             return False
         waarden = {}
         if aan is not None:
             waarden[self.dp_aan] = bool(aan)
-        if helder is not None:
-            if self.dp_helder:
+        if temp is not None and self.dp_temp and self.dp_modus:
+            waarden[self.dp_modus] = "white"
+            waarden[self.dp_temp] = round(max(0, min(100, float(temp))) * 10)
+        elif kleur is not None and self.dp_kleur:
+            v = round(helder * 10) if helder is not None else (self.hsv[2] if self.modus == "colour" and self.hsv else 1000)
+            waarden[self.dp_modus] = "colour"
+            waarden[self.dp_kleur] = self._kleurcode(kleur, 1000, v)
+        if helder is not None and kleur is None:
+            if self.modus == "colour" and self.dp_kleur and self.hsv and temp is None:
+                # Lamp staat op kleur: helderheid zit dan in de kleurwaarde
+                waarden[self.dp_kleur] = self._kleurcode(self.hsv[0], self.hsv[1], round(helder * 10))
+            elif self.dp_helder:
                 waarden[self.dp_helder] = self.van_procent(helder)
-            if aan is None and helder > 0:
-                waarden[self.dp_aan] = True
+        if aan is None and waarden and (helder is None or helder > 0):
+            waarden[self.dp_aan] = True
         if not waarden:
             return True
         with self.slot:
@@ -175,6 +217,15 @@ class Lamp:
                         self.aan = waarden[self.dp_aan]
                     if self.dp_helder in waarden:
                         self.helder = self.naar_procent(waarden[self.dp_helder])
+                    if self.dp_modus in waarden:
+                        self.modus = waarden[self.dp_modus]
+                    if self.dp_temp in waarden:
+                        self.temp = round(waarden[self.dp_temp] / 10)
+                    if self.dp_kleur in waarden:
+                        k = waarden[self.dp_kleur]
+                        self.hsv = (int(k[0:4], 16), int(k[4:8], 16), int(k[8:12], 16))
+                        self.helder = max(1, round(self.hsv[2] / 10))
+                    self.tint = self.hsv[0] if (self.modus == "colour" and self.hsv) else None
                     self.fouten = 0
                     return True
                 except Exception:
@@ -274,6 +325,36 @@ def achtergrond():
         time.sleep(PEIL_ELKE)
 
 
+THERMO = None
+
+
+def thermostaat_lus():
+    """Optioneel: houdt de stand van een Nefit Easy bij (zie thermostaat.py)."""
+    global THERMO
+    if not CFG.get("nefit_serienummer"):
+        return
+    try:
+        from thermostaat import Thermostaat
+    except Exception as e:
+        log(f"thermostaat niet beschikbaar: {e}")
+        return
+    while THERMO is None:
+        try:
+            t = Thermostaat(CFG, log)
+            t.verbind()
+            THERMO = t
+            log("thermostaat verbonden")
+        except Exception as e:
+            log(f"thermostaat: {e}")
+            time.sleep(900)
+    while True:
+        time.sleep(60)
+        try:
+            THERMO.lees()
+        except Exception as e:
+            log(f"thermostaat lezen: {e}")
+
+
 def meld_adres():
     """Vertelt de web-app op welk adres het dashboard de brug kan bereiken."""
     while True:
@@ -295,7 +376,9 @@ def stand():
             lamp = LAMPEN.get(c["id"])
             if lamp and lamp.lokaal:
                 lampen.append({"id": lamp.id, "name": c.get("name") or lamp.naam, "online": True,
-                               "on": lamp.aan, "bright": lamp.helder})
+                               "on": lamp.aan, "bright": lamp.helder,
+                               "temp": lamp.temp if lamp.dp_temp else None,
+                               "rgb": bool(lamp.dp_kleur), "tint": lamp.tint})
             else:
                 lampen.append(c)
         uit.append({"id": r["id"], "name": r["name"], "lamps": lampen})
@@ -315,10 +398,10 @@ def werk_cloudstand_bij(ids, aan, helder):
                         c["bright"] = helder
 
 
-def schakel(ids, aan, helder):
+def schakel(ids, aan, helder, temp=None, kleur=None):
     def een(i):
         lamp = LAMPEN.get(i)
-        return i, bool(lamp and lamp.zet(aan, helder))
+        return i, bool(lamp and lamp.zet(aan, helder, temp, kleur))
 
     resultaat = {}
     rest = []
@@ -333,6 +416,10 @@ def schakel(ids, aan, helder):
             q["on"] = "true" if aan else "false"
         if helder is not None:
             q["bright"] = str(helder)
+        if temp is not None:
+            q["temp"] = str(temp)
+        if kleur is not None:
+            q["kleur"] = str(kleur)
         try:
             r = cloud(q)
             for x in r.get("resultaat", []):
@@ -362,7 +449,15 @@ def verwerk(p):
             aan = str(aan).lower() in ("true", "1")
         helder = p.get("bright")
         helder = None if helder in (None, "") else float(helder)
-        return {"ok": True, "resultaat": schakel(ids, aan, helder), "brug": True}
+        temp = None if p.get("temp") in (None, "") else float(p["temp"])
+        kleur = None if p.get("kleur") in (None, "") else float(p["kleur"])
+        return {"ok": True, "resultaat": schakel(ids, aan, helder, temp, kleur), "brug": True}
+    if actie == "thermostaat":
+        if THERMO is None:
+            return {"ok": True, "brug": True, "thermostaat": {"ok": False, "fout": "niet gekoppeld"}}
+        if p.get("graden") not in (None, ""):
+            THERMO.zet(float(p["graden"]))
+        return {"ok": True, "brug": True, "thermostaat": THERMO.stand or THERMO.lees()}
     if actie in ("scene", "scenes", "agenda"):
         q = {"action": actie}
         if p.get("name"):
@@ -449,6 +544,7 @@ def main():
 
     threading.Thread(target=achtergrond, daemon=True).start()
     threading.Thread(target=meld_adres, daemon=True).start()
+    threading.Thread(target=thermostaat_lus, daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", poort), Verzoek)
     log(f"brug luistert op 127.0.0.1:{poort}")
     server.serve_forever()
