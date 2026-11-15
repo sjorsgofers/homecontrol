@@ -184,6 +184,25 @@ class Thermostaat:
         return g
 
 
+def _zet_stand(self, stand):
+    """Zet de thermostaat op het klokprogramma ('klok') of op handmatig ('handmatig')."""
+    if not self.client:
+        raise RuntimeError(self.fout or "thermostaat niet verbonden")
+    if stand not in ("klok", "handmatig"):
+        raise ValueError(f"onbekende stand: {stand}")
+
+    async def zet():
+        self.client.set_usermode("clock" if stand == "klok" else "manual")
+
+    self._doe(zet(), timeout=15)
+    if self.stand:
+        self.stand["stand"] = stand
+    return stand
+
+
+Thermostaat.zet_stand = _zet_stand
+
+
 def _getal(x):
     try:
         return round(float(x), 1)

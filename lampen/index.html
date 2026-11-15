@@ -255,6 +255,11 @@ input[type=range].warm::-moz-range-progress{background:transparent}
   background:var(--knop-bg);box-shadow:calc(var(--s)*2) calc(var(--s)*3) calc(var(--s)*7) var(--knop-d),calc(var(--s)*-2) calc(var(--s)*-2) calc(var(--s)*5) var(--knop-l);
   font-size:calc(var(--s)*26);line-height:1;color:var(--txt);cursor:pointer}
 .th-knop:active{transform:scale(.92)}
+/* Schakelaar klokprogramma / handmatig */
+.th-stand{appearance:none;-webkit-appearance:none;margin-left:calc(var(--s)*12);height:calc(var(--s)*34);padding:0 calc(var(--s)*13);
+  border:0;border-radius:calc(var(--s)*17);background:var(--diep);font-size:calc(var(--s)*14);color:var(--muted);cursor:pointer;white-space:nowrap;
+  box-shadow:inset calc(var(--s)*1.5) calc(var(--s)*1.5) calc(var(--s)*4) var(--inzet-d),inset calc(var(--s)*-1) calc(var(--s)*-1) calc(var(--s)*3) var(--inzet-l)}
+.th-stand.klok{background:var(--accent-grad);color:var(--accent-ink);box-shadow:none}
 .thermo.stookt .th-nu b{color:var(--accent-tekst)}
 
 /* ---------- Meldingen ---------- */
@@ -362,6 +367,7 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
         <span id="thDoel">–</span>
         <button class="th-knop" id="thOmhoog" aria-label="Temperatuur hoger">+</button>
       </div>
+      <button class="th-stand" id="thStand" aria-label="Klokprogramma of handmatig"></button>
     </div>
     <div class="onder">
       <div id="overig"></div>
@@ -1131,6 +1137,8 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     $('thNu').textContent = graden(t.binnen);
     $('thDoel').textContent = graden(t.ingesteld);
     $('thSub').textContent = t.voorbeeld ? 'voorbeeld' : t.stookt ? 'verwarmt' : 'binnen';
+    $('thStand').textContent = t.stand === 'klok' ? 'klok' : 'handmatig';
+    $('thStand').classList.toggle('klok', t.stand === 'klok');
   }
   function haalThermo(){
     if (DEMO || !KEY) { tekenThermo(); return; }
@@ -1152,6 +1160,17 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
       }).catch(function(){ melding('Thermostaat instellen is niet gelukt'); });
     }, 900);
   }
+  /* Wisselt tussen het klokprogramma van de thermostaat en een vaste (handmatige) temperatuur. */
+  $('thStand').addEventListener('click', function(){
+    var t = thermo || (thermo = { binnen: 20.5, ingesteld: 21, voorbeeld: true });
+    var naar = t.stand === 'klok' ? 'handmatig' : 'klok';
+    t.stand = naar; tekenThermo();
+    if (t.voorbeeld) return;
+    vraag({ action: 'thermostaat', stand: naar }).then(function(j){
+      if (j && j.thermostaat && j.thermostaat.ok) { thermo = j.thermostaat; tekenThermo(); }
+      else melding('Thermostaat omzetten is niet gelukt');
+    }).catch(function(){ melding('Thermostaat omzetten is niet gelukt'); });
+  });
   $('thOmlaag').addEventListener('click', function(){ thermoStap(-0.5); });
   $('thOmhoog').addEventListener('click', function(){ thermoStap(0.5); });
 

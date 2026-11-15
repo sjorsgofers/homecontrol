@@ -455,6 +455,10 @@ def verwerk(p):
     if actie == "thermostaat":
         if THERMO is None:
             return {"ok": True, "brug": True, "thermostaat": {"ok": False, "fout": "niet gekoppeld"}}
+        if p.get("stand") in ("klok", "handmatig"):
+            THERMO.zet_stand(p["stand"])
+            time.sleep(2)          # de thermostaat even de tijd geven en dan de echte stand lezen
+            THERMO.lees()
         if p.get("graden") not in (None, ""):
             THERMO.zet(float(p["graden"]))
         return {"ok": True, "brug": True, "thermostaat": THERMO.stand or THERMO.lees()}
