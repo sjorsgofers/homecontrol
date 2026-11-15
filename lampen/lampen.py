@@ -52,6 +52,17 @@ def start_webserver(poort):
             self.send_header("Cache-Control", "no-store")
             super().end_headers()
 
+        def do_GET(self):
+            # De pagina meldt hier wat hij doet (geladen, fout, aanraking), zodat in
+            # het logboek te zien is wat er op de Hub gebeurt. Nooit de sleutel.
+            if self.path.startswith("/meld"):
+                vraag = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                log(f"Scherm {self.client_address[0]}: {vraag.get('t', [''])[0][:200]}")
+                self.send_response(204)
+                self.end_headers()
+                return
+            super().do_GET()
+
     handler = functools.partial(Stil, directory=MAP)
     server = http.server.ThreadingHTTPServer(("0.0.0.0", poort), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -72,14 +83,19 @@ def verbind(naam):
     while True:
         try:
             casts, browser = pychromecast.get_listed_chromecasts(friendly_names=[naam], discovery_timeout=15)
-            browser.stop_discovery()
             if casts:
                 cast = casts[0]
-                cast.wait(timeout=20)
+                # Pas ná het verbinden stoppen met zoeken: pychromecast heeft de
+                # zoeker (zeroconf) nog nodig om het adres van de Hub op te vragen.
+                try:
+                    cast.wait(timeout=20)
+                finally:
+                    browser.stop_discovery()
                 dash = DashCastController()
                 cast.register_handler(dash)
                 log(f'Verbonden met "{naam}" ({cast.cast_info.host})')
                 return cast, dash
+            browser.stop_discovery()
             log(f'"{naam}" niet gevonden, over 30 s opnieuw (namen tonen: --zoek)')
         except Exception as e:  # netwerk weg, Hub herstart, ...
             log(f"Verbinden mislukt: {e}")
@@ -94,6 +110,8 @@ def main():
     a.add_argument("--key", help="de SLEUTEL uit het Apps Script")
     a.add_argument("--poort", type=int, default=8321)
     a.add_argument("--poll", type=int, default=120, help="seconden tussen statusupdates (standaard 120)")
+    a.add_argument("--lat", help="breedtegraad voor het weer (optioneel, samen met --lon)")
+    a.add_argument("--lon", help="lengtegraad voor het weer (optioneel, samen met --lat)")
     a.add_argument("--demo", action="store_true", help="toon voorbeeldgegevens, zonder koppeling")
     args = a.parse_args()
 
@@ -108,6 +126,8 @@ def main():
 
     def url():
         q = {"demo": "1"} if args.demo else {"api": args.api, "key": args.key, "poll": args.poll}
+        if args.lat and args.lon:
+            q.update({"lat": args.lat, "lon": args.lon})
         return f"http://{eigen_ip(cast.cast_info.host)}:{args.poort}/index.html?" + urllib.parse.urlencode(q)
 
     laatst = 0
@@ -119,6 +139,13 @@ def main():
             # Draait onze pagina al: alleen eens per 6 uur vers laden.
             # Iets anders (muziek, video): niet onderbreken.
             if cast.is_idle or (cast.app_id == APP_DASHCAST and time.time() - laatst > OPNIEUW_ELKE):
+                if cast.app_id == APP_DASHCAST:
+                    # Met force=True vervangt onze pagina de DashCast-ontvanger; die
+                    # luistert daarna niet meer naar een nieuwe opdracht. Daarom eerst
+                    # afsluiten, zodat hij vers start en de nieuwe pagina echt laadt.
+                    log("Oude pagina afsluiten")
+                    cast.quit_app()
+                    time.sleep(6)
                 log("Pagina casten")
                 dash.load_url(url(), force=True, reload_seconds=0)
                 laatst = time.time()

@@ -2,136 +2,226 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Lampen</title>
-<meta name="theme-color" content="#0f1216">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Ccircle cx=%2212%22 cy=%2210%22 r=%227%22 fill=%22%23f5b94a%22/%3E%3Crect x=%229%22 y=%2218%22 width=%226%22 height=%223%22 rx=%221%22 fill=%22%23f5b94a%22/%3E%3C/svg%3E">
+<meta name="theme-color" content="#172135">
+<!-- Webapp: op iPad/telefoon via 'Zet op beginscherm' schermvullend te openen -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lampen">
+<link rel="apple-touch-icon" href="icoon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Ccircle cx=%2212%22 cy=%2210%22 r=%227%22 fill=%22%23f6cf4f%22/%3E%3Crect x=%229%22 y=%2218%22 width=%226%22 height=%223%22 rx=%221%22 fill=%22%23f6cf4f%22/%3E%3C/svg%3E">
 <style>
+/* Alle maten hangen aan twee eenheden die het script bij het laden/draaien zet:
+   --s  schaal van de linkerkolom (1px op een scherm van 1024 breed)
+   --u  één eenheid van de plattegrond (zie PLATTEGROND onderaan) */
 :root{
-  --gold:#f5b94a; --gold-bright:#ffd88a; --gold-deep:#a8741c;
-  --bg:#0f1216; --panel:#1a1e24; --panel2:#15181d;
-  --line:rgba(255,255,255,.08); --line-strong:rgba(245,185,74,.5);
-  --txt:#eef1f5; --muted:rgba(238,241,245,.55); --faint:rgba(238,241,245,.3);
-  --grad-gold:linear-gradient(180deg,#ffe3a6 0%,#f5b94a 100%);
-  --red:#e07a5f;
+  --s:1px; --u:1px;
+  --bg:#172135; --vlak:#1c2740; --diep:#141c2e;
+  --kamer:#25334f; --hal:#3a4864; --muur:#1c2842;
+  --txt:#f2f5fa; --muted:rgba(226,232,244,.62); --faint:rgba(226,232,244,.32);
+  --geel:#f6cf4f; --rood:#e58a70;
   --ease:cubic-bezier(.4,0,.2,1);
+  --schaduw:calc(var(--s)*8) calc(var(--s)*9) calc(var(--s)*20) rgba(6,10,20,.62),
+            calc(var(--s)*-6) calc(var(--s)*-6) calc(var(--s)*16) rgba(92,114,158,.12);
 }
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);overflow:hidden;
-  font-family:Inter,Roboto,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
-  -webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
-body::before{content:"";position:fixed;inset:0;pointer-events:none;
-  background:radial-gradient(ellipse 80% 60% at 10% -10%,rgba(120,140,170,.10),transparent 60%)}
-button{font-family:inherit;color:inherit}
+html,body{margin:0;height:100%;overflow:hidden;color:var(--txt);
+  font-family:Roboto,"Google Sans","Segoe UI",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;
+  -webkit-touch-callout:none;touch-action:manipulation}
+body{background:var(--bg);
+  background:radial-gradient(ellipse 95% 85% at 28% 18%,#1e2a43 0%,#172135 52%,#121a2b 100%)}
+button{font-family:inherit;color:inherit;margin:0}
 
-#app{position:relative;display:flex;flex-direction:column;height:100vh;padding:14px 18px 16px;gap:12px}
+#app{display:flex;align-items:stretch;height:100vh;padding:calc(var(--s)*28)}
+/* Schermvullende webapp: ruimte laten voor statusbalk en afgeronde hoeken */
+@supports (padding:max(0px)){
+  #app{padding-top:max(calc(var(--s)*28),env(safe-area-inset-top));padding-bottom:max(calc(var(--s)*28),env(safe-area-inset-bottom));
+    padding-left:max(calc(var(--s)*28),env(safe-area-inset-left));padding-right:max(calc(var(--s)*28),env(safe-area-inset-right))}
+}
 
-/* Kopregel */
-header{flex:0 0 auto;display:flex;align-items:center;gap:14px;min-height:52px}
-.titel{font-size:22px;font-weight:650;letter-spacing:.01em;color:var(--txt)}
-.stip{width:9px;height:9px;border-radius:50%;background:#6fbf73;box-shadow:0 0 8px rgba(111,191,115,.7);flex:0 0 auto;transition:background .3s}
-.stip.bezig{background:var(--gold);box-shadow:0 0 8px rgba(245,185,74,.7)}
-.stip.fout{background:var(--red);box-shadow:0 0 8px rgba(224,122,95,.7)}
-.ruimte{flex:1}
-.klok{font-size:30px;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:.02em;color:var(--txt)}
-.knop{appearance:none;border:1px solid var(--line);background:#1f242b;
-  border-radius:999px;padding:0 22px;height:48px;font-size:17px;font-weight:600;cursor:pointer;color:var(--txt);
-  transition:transform .15s var(--ease),border-color .2s}
-.knop:active{transform:scale(.96);border-color:var(--line-strong)}
+/* ---------- Linkerkolom: klok, datum, alles uit, weer ---------- */
+#links{position:relative;z-index:2;flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:flex-start;
+  padding:calc(var(--s)*20) 0 calc(var(--s)*6) calc(var(--s)*28)}
+.klok{font-size:calc(var(--s)*132);line-height:1;font-weight:400;letter-spacing:-.015em;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.datum{display:flex;align-items:center;margin-top:calc(var(--s)*12);font-size:calc(var(--s)*26);white-space:nowrap}
+.stip{flex:0 0 auto;width:calc(var(--s)*9);height:calc(var(--s)*9);margin-left:calc(var(--s)*14);border-radius:50%;
+  background:#6fbf73;opacity:.85;transition:background .3s}
+.stip.bezig{background:var(--geel)}
+.stip.fout{background:var(--rood)}
 
-/* Raster met ruimtes */
-#raster{flex:1;min-height:0;display:grid;gap:12px;overflow-y:auto;scrollbar-width:none}
-#raster::-webkit-scrollbar{display:none}
+.uit-tegel{appearance:none;-webkit-appearance:none;border:0;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:calc(var(--s)*216);height:calc(var(--s)*216);margin-top:calc(var(--s)*62);padding:0;
+  border-radius:calc(var(--s)*22);background:var(--vlak);box-shadow:var(--schaduw);
+  font-size:calc(var(--s)*25);transition:transform .15s var(--ease)}
+.uit-tegel:active{transform:scale(.97)}
+.uit-tegel .rond{display:flex;align-items:center;justify-content:center;
+  width:calc(var(--s)*76);height:calc(var(--s)*76);margin-bottom:calc(var(--s)*24);border-radius:50%;background:var(--diep);
+  box-shadow:inset calc(var(--s)*3) calc(var(--s)*3) calc(var(--s)*8) rgba(4,7,14,.7),
+             inset calc(var(--s)*-2) calc(var(--s)*-2) calc(var(--s)*6) rgba(92,114,158,.14)}
+.uit-tegel svg{width:calc(var(--s)*32);height:calc(var(--s)*32);stroke:#9aa7c0}
 
-.tegel{position:relative;display:flex;flex-direction:column;justify-content:space-between;gap:10px;
-  min-height:150px;padding:16px 18px 18px;border-radius:22px;overflow:hidden;
-  background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
-  transition:border-color .3s,box-shadow .3s}
-.tegel::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .4s var(--ease);
-  background:radial-gradient(ellipse 90% 90% at 85% 0%,rgba(255,206,120,.30),rgba(245,185,74,.08) 55%,transparent 80%)}
-.tegel.aan{border-color:var(--line-strong);box-shadow:0 10px 30px -14px rgba(245,185,74,.45)}
-.tegel.aan::before{opacity:var(--gloed,1)}
-.tegel > *{position:relative}
+.onder{margin-top:auto;display:flex;flex-direction:column;align-items:flex-start}
+.chip{display:flex;align-items:center;height:calc(var(--s)*48);margin-top:calc(var(--s)*16);padding:0 calc(var(--s)*18);
+  border:0;border-radius:calc(var(--s)*13);background:var(--vlak);box-shadow:var(--schaduw);
+  font-size:calc(var(--s)*21);white-space:nowrap}
+.chip svg{width:calc(var(--s)*26);height:calc(var(--s)*26);margin-right:calc(var(--s)*12);stroke:#9aa7c0}
+.chip small{margin-left:calc(var(--s)*10);font-size:calc(var(--s)*15);color:var(--muted)}
+button.chip{cursor:pointer}
+.chip.aan{background:linear-gradient(160deg,#4a4630,#2c3040)}
+.chip.aan small{color:var(--geel)}
 
-.kop{display:flex;align-items:flex-start;gap:12px}
-.naam{flex:1;min-width:0;cursor:pointer}
-.naam b{display:block;font-size:24px;font-weight:650;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.naam span{display:block;margin-top:4px;font-size:15px;color:var(--muted)}
-.naam span::after{content:" ›";color:var(--faint)}
+/* ---------- Plattegrond ---------- */
+#plan{position:relative;flex:0 0 auto;align-self:center;width:calc(var(--u)*660);height:calc(var(--u)*652)}
+#plan svg.muur{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;
+  -webkit-filter:drop-shadow(calc(var(--u)*10) calc(var(--u)*12) calc(var(--u)*16) rgba(5,9,18,.62))
+                 drop-shadow(calc(var(--u)*-5) calc(var(--u)*-5) calc(var(--u)*12) rgba(92,114,158,.11));
+  filter:drop-shadow(calc(var(--u)*10) calc(var(--u)*12) calc(var(--u)*16) rgba(5,9,18,.62))
+         drop-shadow(calc(var(--u)*-5) calc(var(--u)*-5) calc(var(--u)*12) rgba(92,114,158,.11))}
+svg.muur path{fill:var(--muur)}
 
-.aanuit{appearance:none;flex:0 0 auto;width:68px;height:68px;border-radius:50%;cursor:pointer;
-  border:1px solid var(--line);background:#111418;display:grid;place-items:center;
-  transition:transform .15s var(--ease),background .3s,box-shadow .3s}
-.aanuit svg{width:30px;height:30px;stroke:var(--faint);transition:stroke .3s}
-.aanuit:active{transform:scale(.92)}
-.tegel.aan .aanuit{background:var(--grad-gold);border-color:transparent;box-shadow:0 0 26px -2px rgba(255,206,120,.5)}
-.tegel.aan .aanuit svg{stroke:#3a2705}
-.tegel.bezig .aanuit{animation:puls 1s ease-in-out infinite}
-@keyframes puls{50%{opacity:.55}}
+.kamer{position:absolute;overflow:hidden;cursor:pointer;border-radius:calc(var(--u)*7);background:var(--kamer);
+  box-shadow:inset 0 calc(var(--u)*1.5) 0 rgba(255,255,255,.05),inset 0 calc(var(--u)*-3) calc(var(--u)*8) rgba(8,12,24,.22);
+  transition:color .4s}
+.kamer.hal{background:var(--hal)}
+.kamer::before{content:"";position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;opacity:0;
+  transition:opacity .45s var(--ease);
+  background:radial-gradient(circle calc(var(--u)*560) at var(--bx) var(--by),
+    rgba(255,231,140,.84) 0%,rgba(228,199,102,.62) 26%,rgba(160,150,90,.38) 58%,rgba(60,75,95,0) 100%)}
+.kamer.vol::before{background:linear-gradient(180deg,#fff5c8 0%,#f8e5a2 100%)}
+.kamer.aan::before{opacity:var(--gloed,1)}
+.kamer.vol.aan{color:#2c2a1f}
+.kamer > *{position:absolute}
+.kamer{touch-action:none}
 
-/* Helderheid */
-.dim{display:flex;align-items:center;gap:12px}
-.dim .pct{width:52px;text-align:right;font-size:16px;font-variant-numeric:tabular-nums;color:var(--muted)}
-input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:40px;background:transparent;margin:0;touch-action:none;cursor:pointer}
-input[type=range]::-webkit-slider-runnable-track{height:12px;border-radius:999px;
-  background:linear-gradient(90deg,var(--gold) 0 var(--v,50%),rgba(255,255,255,.10) var(--v,50%) 100%)}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:34px;height:34px;margin-top:-11px;border-radius:50%;
-  background:#fff;border:3px solid var(--gold);box-shadow:0 2px 10px rgba(0,0,0,.5)}
-input[type=range]::-moz-range-track{height:12px;border-radius:999px;background:rgba(255,255,255,.10)}
-input[type=range]::-moz-range-progress{height:12px;border-radius:999px;background:var(--gold)}
-input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#fff;border:3px solid var(--gold)}
-input[type=range]:disabled{opacity:.35}
-.tegel:not(.aan) input[type=range]::-webkit-slider-runnable-track{background:linear-gradient(90deg,rgba(245,185,74,.30) 0 var(--v,50%),rgba(255,255,255,.07) var(--v,50%) 100%)}
+/* Helderheidsbalk tijdens het vegen */
+.balk{left:0;top:0;bottom:0;width:0;pointer-events:none;opacity:0;transition:opacity .5s var(--ease);
+  background:linear-gradient(90deg,rgba(255,226,130,.08),rgba(255,226,130,.34));
+  border-right:calc(var(--u)*2.5) solid rgba(255,238,175,.85)}
+.kamer.draai .balk{top:auto;width:100%;height:0;border-right:0;
+  background:linear-gradient(0deg,rgba(255,226,130,.08),rgba(255,226,130,.34));
+  border-top:calc(var(--u)*2.5) solid rgba(255,238,175,.85)}
+.kamer.vol .balk{background:linear-gradient(90deg,rgba(120,90,10,.05),rgba(120,90,10,.22));border-color:rgba(120,90,10,.55)}
+.kamer.dimt .balk{opacity:1}
+.kamer.dimt .status{color:var(--txt);font-size:calc(var(--u)*19)}
+.kamer.vol.dimt .status{color:#3a3523}
 
-/* Paneel met losse lampen */
-#paneel{position:fixed;inset:0;z-index:20;display:none;align-items:stretch;justify-content:flex-end;background:rgba(0,0,0,.55)}
+.naam{-webkit-transform:translate(-50%,-50%);transform:translate(-50%,-50%);font-size:calc(var(--u)*25);white-space:nowrap}
+.kamer.draai .naam{-webkit-transform:translate(-50%,-50%) rotate(-90deg);transform:translate(-50%,-50%) rotate(-90deg)}
+.status{-webkit-transform:translate(-50%,-50%);transform:translate(-50%,-50%);font-size:calc(var(--u)*15);white-space:nowrap;
+  color:var(--muted);padding:calc(var(--u)*2) calc(var(--u)*10);border-radius:calc(var(--u)*20);transition:color .4s,background .4s}
+.kamer.aan .status{color:var(--txt)}
+.kamer.vol.aan .status{color:#3a3523;background:rgba(70,58,12,.14)}
+
+.knop{appearance:none;-webkit-appearance:none;border:0;padding:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  width:calc(var(--u)*64);height:calc(var(--u)*64);border-radius:50%;
+  -webkit-transform:translate(-50%,-50%);transform:translate(-50%,-50%);background:#2b3854;
+  box-shadow:calc(var(--u)*4) calc(var(--u)*5) calc(var(--u)*11) rgba(8,12,24,.5),
+             calc(var(--u)*-3) calc(var(--u)*-3) calc(var(--u)*8) rgba(130,150,190,.16);
+  transition:background .35s,box-shadow .35s}
+.knop svg{width:calc(var(--u)*31);height:calc(var(--u)*31);stroke:#8f9cb6;transition:stroke .35s}
+.knop:active{-webkit-transform:translate(-50%,-50%) scale(.92);transform:translate(-50%,-50%) scale(.92)}
+.kamer.aan .knop{background:linear-gradient(160deg,#ffeb9c 0%,#f3c440 100%);
+  box-shadow:0 0 calc(var(--u)*26) rgba(255,216,96,.55),calc(var(--u)*3) calc(var(--u)*5) calc(var(--u)*10) rgba(110,84,10,.35)}
+.kamer.aan .knop svg{stroke:#4a3a08}
+.kamer.bezig .knop{animation:puls 1s ease-in-out infinite}
+.kamer.leeg{cursor:default}
+.kamer.leeg .knop,.kamer.leeg .status{opacity:.4}
+@keyframes puls{50%{opacity:.5}}
+
+/* ---------- Paneel met losse lampen ---------- */
+#paneel{position:fixed;left:0;top:0;right:0;bottom:0;z-index:20;display:none;justify-content:flex-end;background:rgba(6,10,20,.6)}
 #paneel.open{display:flex}
-.vel{width:min(560px,92vw);height:100%;background:#15181d;border-left:1px solid var(--line);
-  display:flex;flex-direction:column;padding:16px 18px;gap:12px;animation:schuif .22s var(--ease)}
+.vel{width:560px;max-width:92vw;height:100%;display:flex;flex-direction:column;padding:18px 20px;
+  background:#182236;border-left:1px solid rgba(255,255,255,.07);animation:schuif .22s var(--ease)}
 @keyframes schuif{from{transform:translateX(40px);opacity:0}}
-.vel-kop{display:flex;align-items:center;gap:12px}
-.vel-kop b{flex:1;font-size:24px;font-weight:650}
-.sluit{width:48px;height:48px;padding:0;font-size:26px;line-height:1}
-#lampen{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;scrollbar-width:none}
+.vel-kop{display:flex;align-items:center;margin-bottom:12px}
+.vel-kop b{flex:1;font-size:26px;font-weight:500}
+.sluit{appearance:none;-webkit-appearance:none;width:50px;height:50px;margin-left:14px;padding:0;border:0;border-radius:50%;
+  background:var(--vlak);box-shadow:4px 5px 12px rgba(6,10,20,.6),-3px -3px 9px rgba(92,114,158,.12);
+  font-size:28px;line-height:1;cursor:pointer}
+#lampen{flex:1;overflow-y:auto;scrollbar-width:none}
 #lampen::-webkit-scrollbar{display:none}
-.lamp{display:grid;grid-template-columns:1fr auto;gap:4px 14px;align-items:center;padding:10px 14px;border-radius:16px;
-  background:rgba(255,255,255,.03);border:1px solid var(--line)}
-.lamp.aan{border-color:var(--line-strong);background:rgba(245,185,74,.08)}
-.lamp .ln{font-size:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lamp .ln small{display:block;font-size:13px;font-weight:500;color:var(--red)}
-.lamp .dim{grid-column:1/-1}
-.schakel{appearance:none;width:72px;height:42px;border-radius:999px;border:1px solid var(--line);background:#111418;position:relative;cursor:pointer;transition:background .25s}
-.schakel::after{content:"";position:absolute;top:4px;left:4px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.35);transition:transform .25s var(--ease),background .25s}
-.lamp.aan .schakel{background:var(--grad-gold);border-color:transparent}
-.lamp.aan .schakel::after{transform:translateX(30px);background:#fff}
+.lamp{display:flex;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:12px 16px;border-radius:16px;
+  background:#1f2b45;border:1px solid rgba(255,255,255,.05)}
+.lamp.aan{border-color:rgba(246,207,79,.45);background:#2a3147}
+.lamp.geheel{background:var(--vlak);margin-bottom:16px}
+.lamp .ln{flex:1;min-width:0;font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lamp.geheel .ln{flex:0 0 100%;color:var(--muted);font-size:16px}
+.lamp .ln small{display:block;font-size:13px;color:var(--rood)}
+.lamp .dim{flex:0 0 100%;display:flex;align-items:center;margin-top:4px}
+.lamp .pct{width:54px;text-align:right;font-size:16px;font-variant-numeric:tabular-nums;color:var(--muted)}
 .lamp.offline{opacity:.5}
+.schakel{appearance:none;-webkit-appearance:none;position:relative;flex:0 0 auto;width:72px;height:42px;padding:0;
+  border:0;border-radius:999px;background:var(--diep);cursor:pointer;transition:background .25s;
+  box-shadow:inset 2px 2px 6px rgba(4,7,14,.7)}
+.schakel::after{content:"";position:absolute;top:5px;left:5px;width:32px;height:32px;border-radius:50%;
+  background:#56627c;transition:transform .25s var(--ease),background .25s}
+.aan > .schakel{background:linear-gradient(160deg,#ffeb9c,#f3c440)}
+.aan > .schakel::after{transform:translateX(30px);background:#fff}
+input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:40px;margin:0;background:transparent;touch-action:none;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:12px;border-radius:999px;
+  background:linear-gradient(90deg,var(--geel) 0,var(--geel) var(--v,50%),rgba(255,255,255,.10) var(--v,50%),rgba(255,255,255,.10) 100%)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:34px;height:34px;margin-top:-11px;border-radius:50%;
+  background:#fff;border:3px solid var(--geel);box-shadow:0 2px 10px rgba(0,0,0,.5)}
+input[type=range]::-moz-range-track{height:12px;border-radius:999px;background:rgba(255,255,255,.10)}
+input[type=range]::-moz-range-progress{height:12px;border-radius:999px;background:var(--geel)}
+input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#fff;border:3px solid var(--geel)}
+input[type=range]:disabled{opacity:.35}
 
-/* Meldingen */
-#melding{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:30;
-  padding:12px 20px;border-radius:14px;background:#2a1712;border:1px solid rgba(224,122,95,.5);color:#ffd9cf;font-size:16px;
-  transition:all .25s var(--ease);max-width:90vw;text-align:center}
+/* ---------- Meldingen ---------- */
+#melding{position:fixed;left:50%;bottom:18px;z-index:30;max-width:90vw;padding:12px 20px;border-radius:14px;
+  transform:translate(-50%,20px);opacity:0;pointer-events:none;text-align:center;font-size:16px;
+  background:#2a1b1a;border:1px solid rgba(229,138,112,.5);color:#ffd9cf;transition:all .25s var(--ease)}
 #melding.toon{opacity:1;transform:translate(-50%,0)}
-#demo{position:fixed;right:14px;bottom:12px;font-size:12px;color:var(--faint);letter-spacing:.04em}
-.leeg{grid-column:1/-1;align-self:center;text-align:center;color:var(--muted);font-size:18px;line-height:1.5}
+/* Partyknop: zelfde kader als het weer, half zo breed, met een gedempt discobolletje */
+.rij{display:flex;align-items:center}
+.rij .chip + .chip{margin-left:calc(var(--s)*12)}
+#party{appearance:none;-webkit-appearance:none;justify-content:center;width:calc(var(--s)*54);padding:0;cursor:pointer;
+  transition:background .4s}
+#party svg{margin:0;width:calc(var(--s)*26);height:calc(var(--s)*26);stroke:#6f7b96;stroke-width:1.7;transition:stroke .4s}
+#party.aan{background:linear-gradient(160deg,#3a2f52,#232a44)}
+#party.aan svg{stroke:#e2b6ff;animation:draai 7s linear infinite}
+#party.bezig svg{animation:puls 1s ease-in-out infinite}
+@keyframes draai{to{transform:rotate(360deg)}}
+#demo{position:fixed;right:12px;bottom:8px;font-size:11px;color:var(--faint);letter-spacing:.04em}
 
-@media (max-height:520px){ .tegel{min-height:120px;padding:12px 14px 12px} .naam b{font-size:20px} .aanuit{width:56px;height:56px} }
+/* ---------- Staand scherm (telefoon): alles onder elkaar ---------- */
+html.staand,html.staand body{height:auto;min-height:100%;overflow-y:auto}
+.staand #app{flex-direction:column;height:auto;min-height:100vh}
+.staand #links{flex:0 0 auto;padding:calc(var(--s)*10) 0 calc(var(--s)*26) calc(var(--s)*6)}
+.staand .uit-tegel{flex-direction:row;width:100%;height:calc(var(--s)*96);margin-top:calc(var(--s)*28)}
+.staand .uit-tegel .rond{margin:0 calc(var(--s)*20) 0 0;width:calc(var(--s)*58);height:calc(var(--s)*58)}
+.staand .onder{margin-top:0;flex-direction:row;flex-wrap:wrap}
+.staand .chip{margin-right:calc(var(--s)*14)}
 </style>
 </head>
 <body>
 <div id="app">
-  <header>
-    <span class="titel">Lampen</span>
-    <span class="stip" id="stip" title=""></span>
-    <span class="ruimte"></span>
-    <span class="klok" id="klok">--:--</span>
-    <button class="knop" id="allesUit">Alles uit</button>
-  </header>
-  <main id="raster"><div class="leeg">Lampen laden…</div></main>
+  <aside id="links">
+    <div class="klok" id="klok">--:--</div>
+    <div class="datum"><span id="datum"></span><span class="stip" id="stip"></span></div>
+    <button class="uit-tegel" id="allesUit"><span class="rond" id="uitIcoon"></span><span>Alle lampen uit</span></button>
+    <div class="onder">
+      <div id="overig"></div>
+      <div class="rij">
+        <div class="chip" id="weer" hidden><span id="weerIcoon"></span><span id="weerTemp"></span></div>
+        <button class="chip" id="party" aria-label="Partymodus"></button>
+      </div>
+    </div>
+  </aside>
+  <main id="plan"></main>
 </div>
 
 <div id="paneel">
   <div class="vel">
-    <div class="vel-kop"><b id="velNaam"></b><button class="knop sluit" id="sluit" aria-label="Sluiten">×</button></div>
+    <div class="vel-kop" id="velKop"><b id="velNaam"></b><button class="schakel" id="velSchakel" aria-label="Hele ruimte aan/uit"></button><button class="sluit" id="sluit" aria-label="Sluiten">×</button></div>
     <div id="lampen"></div>
   </div>
 </div>
@@ -142,33 +232,124 @@ input[type=range]:disabled{opacity:.35}
 (function(){
   /* ---------- Instellingen ----------
      Geef de /exec-URL van apps-script.gs en de sleutel mee in de URL:
-     ?api=<exec-url>&key=<SLEUTEL>  (lampen.py doet dat vanzelf). */
+     ?api=<exec-url>&key=<SLEUTEL>  (lampen.py doet dat vanzelf).
+     Optioneel voor het weer: &lat=<breedtegraad>&lon=<lengtegraad>. */
   var API_URL = '';
 
-  var qs = new URLSearchParams(location.search);
-  function bewaar(k, v){ try{ if(v) localStorage.setItem('lampen_'+k, v); return v || localStorage.getItem('lampen_'+k) || ''; }catch(e){ return v || ''; } }
-  var API = bewaar('api', qs.get('api')) || API_URL;
-  var KEY = bewaar('key', qs.get('key'));
-  var POLL = Math.max(20, Number(qs.get('poll')) || 120) * 1000;
-  var DEMO = !API || qs.has('demo');
+  /* ---------- Scènes ----------
+     Het discobolletje naast het weer start de scène 'party'; nog een keer drukken start
+     de scène 'standaard'. De namen moeten gelijk zijn aan de tik-om-te-starten-scènes
+     in de app (hoofdletters maken niet uit). */
+  var SCENES = { party: 'Party', standaard: 'Standaard' };
 
-  var ICOON = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.2a8 8 0 1 0 11.4 0"/></svg>';
+  /* ---------- Plattegrond ----------
+     Eenheden op een vlak van 660 x 652. 'muur' is de buitenomtrek van de woning.
+     Per kamer: plek en maat, en binnen de kamer de plek van naam, lampknop en status.
+     'naam' moet gelijk zijn aan de ruimtenaam in de app (hoofdletters maken niet uit);
+     andere schrijfwijzen kunnen in 'ook', bv. ook:['Living','Huiskamer'].
+     licht:'vol' = hele kamer licht als de lamp aan is; anders een gloed rond de knop. */
+  var PLATTEGROND = {
+    breedte: 660, hoogte: 652,
+    muur: [[350,0],[660,0],[660,652],[0,652],[0,233],[260,233],[260,98],[350,98]],
+    kamers: [
+      { naam:'Slaapkamer', x:360, y:10,  w:280, h:190, tekst:[140,38],  lamp:[140,100], status:[140,154], licht:'vol' },
+      { naam:'Hal',        x:270, y:108, w:80,  h:270, tekst:[40,140],  lamp:[40,50],   status:[40,98],   draai:true, hal:true },
+      { naam:'Keuken',     x:20,  y:242, w:240, h:133, tekst:[120,90],  lamp:[197,52],  status:[197,99] },
+      { naam:'Kast',       x:360, y:210, w:280, h:165, tekst:[137,85],  lamp:[217,83],  status:[217,130] },
+      { naam:'Woonkamer',  x:20,  y:387, w:620, h:250, tekst:[283,126], lamp:[488,121], status:[488,174] }
+    ]
+  };
+
+  /* Instellingen komen uit de link: achter ? (lampen.py) of achter # (webapp op iPad of
+     telefoon). Wat achter # staat wordt niet naar de webserver gestuurd; gebruik dat
+     dus voor de sleutel als de pagina online staat. 'id' is de korte vorm van 'api':
+     alleen de implementatie-ID uit de /exec-URL. */
+  var qs = new URLSearchParams(location.search);
+  var hs = new URLSearchParams(location.hash.replace(/^#/, ''));
+  function par(n){ return hs.get(n) || qs.get(n) || ''; }
+  function bewaar(k, v){ try{ if(v) localStorage.setItem('lampen_'+k, v); return v || localStorage.getItem('lampen_'+k) || ''; }catch(e){ return v || ''; } }
+  var apiUitLink = par('api') || (par('id') ? 'https://script.google.com/macros/s/' + par('id') + '/exec' : '');
+  var API = bewaar('api', apiUitLink) || API_URL;
+  var KEY = bewaar('key', par('key'));
+  var LAT = bewaar('lat', par('lat'));
+  var LON = bewaar('lon', par('lon'));
+  var POLL = Math.max(20, Number(par('poll')) || 120) * 1000;
+  var DEMO = !API || qs.has('demo') || hs.has('demo');
+
+  function svg(paden){ return '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + paden + '</svg>'; }
+  var ICOON = {
+    lamp: svg('<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>'),
+    lampUit: svg('<path d="M16.8 11.2c.8-.9 1.2-2 1.2-3.2a6 6 0 0 0-9.3-5"/><path d="m2 2 20 20"/><path d="M6.3 6.3a4.67 4.67 0 0 0 1.2 5.2c.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>'),
+    zon: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>'),
+    wolk: svg('<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>'),
+    regen: svg('<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/><path d="M16 14v6M8 14v6M12 16v6"/>'),
+    disco: svg('<path d="M12 2v5"/><circle cx="12" cy="14" r="7"/><path d="M5.4 12h13.2M5.4 16h13.2"/><path d="M12 7c-2.6 2-2.6 12 0 14M12 7c2.6 2 2.6 12 0 14"/>'),
+    sneeuw: svg('<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/><path d="M8 15h.01M8 19h.01M12 17h.01M12 21h.01M16 15h.01M16 19h.01"/>')
+  };
 
   var ruimtes = [];
-  var bezig = {};          // ruimte-id -> true terwijl een opdracht loopt
+  var bezig = {};          // ruimte-id -> aantal lopende opdrachten
   var open = null;         // ruimte-id van het geopende paneel
   var bijwerkTimer = null;
 
   var $ = function(id){ return document.getElementById(id); };
+  $('uitIcoon').innerHTML = ICOON.lampUit;
 
-  /* ---------- Klok ---------- */
+  /* ---------- Maatvoering ---------- */
+  function maat(){
+    var W = innerWidth, H = innerHeight, P = PLATTEGROND, s, u, rand;
+    var staand = W < H;
+    document.documentElement.classList.toggle('staand', staand);
+    if (staand) {
+      s = W / 620; rand = 28 * s;
+      u = (W - 2 * rand) / P.breedte;
+    } else {
+      s = Math.min(W / 1024, H / 700); rand = 28 * s;
+      u = Math.min((H - 2 * rand) / P.hoogte, (W * 0.66 - rand) / P.breedte);
+    }
+    document.documentElement.style.setProperty('--s', s.toFixed(4) + 'px');
+    document.documentElement.style.setProperty('--u', u.toFixed(4) + 'px');
+  }
+
+  /* ---------- Klok en datum ---------- */
+  var DAGEN = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'];
+  var MAANDEN = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
   function klok(){
     var d = new Date();
     $('klok').textContent = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    $('datum').textContent = DAGEN[d.getDay()] + ' ' + d.getDate() + ' ' + MAANDEN[d.getMonth()] + ' ' + d.getFullYear();
   }
   klok(); setInterval(klok, 5000);
 
+  /* ---------- Weer (alleen als lat/lon zijn meegegeven) ---------- */
+  function toonWeer(graden, code){
+    var ic = code <= 1 ? ICOON.zon : code < 50 ? ICOON.wolk : (code >= 71 && code <= 77) || code === 85 || code === 86 ? ICOON.sneeuw : ICOON.regen;
+    $('weerIcoon').innerHTML = ic;
+    $('weerTemp').textContent = Math.round(graden) + '°C';
+    $('weer').hidden = false;
+  }
+  function weer(){
+    if (!LAT || !LON) return;
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(LAT) + '&longitude=' + encodeURIComponent(LON) + '&current=temperature_2m,weather_code')
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if (j && j.current) toonWeer(j.current.temperature_2m, j.current.weather_code); })
+      .catch(function(){});
+  }
+
   /* ---------- Communicatie ---------- */
+  /* Meldt aan lampen.py wat de pagina doet (komt daar in het logboek). Nooit de sleutel. */
+  var gemeld = '';
+  function meld(t){
+    if (location.protocol !== 'http:' || t === gemeld) return;
+    gemeld = t;
+    try { new Image().src = 'meld?t=' + encodeURIComponent(t) + '&_=' + Date.now(); } catch (e) {}
+  }
+  addEventListener('error', function(e){ meld('scriptfout: ' + (e.message || '?') + ' (regel ' + (e.lineno || '?') + ')'); });
+  (function(){
+    var eens = function(){ meld('aanraking werkt'); removeEventListener('pointerdown', eens, true); removeEventListener('touchstart', eens, true); };
+    addEventListener('pointerdown', eens, true); addEventListener('touchstart', eens, true);
+  })();
+
   function stip(s, tekst){ $('stip').className = 'stip' + (s ? ' '+s : ''); $('stip').title = tekst || ''; }
 
   function melding(t){
@@ -177,7 +358,7 @@ input[type=range]:disabled{opacity:.35}
   }
 
   function haalStand(vers){
-    if (DEMO) { if (!ruimtes.length) ruimtes = demoData(); teken(); return Promise.resolve(); }
+    if (DEMO) { if (!ruimtes.length) ruimtes = demoData(); teken(); meld('geladen: demo, ' + innerWidth + 'x' + innerHeight); return Promise.resolve(); }
     stip('bezig');
     var url = API + (API.indexOf('?') >= 0 ? '&' : '?') + 'action=' + (vers ? 'refresh' : 'state') + '&key=' + encodeURIComponent(KEY) + '&_=' + Date.now();
     return fetch(url, { cache:'no-store' }).then(function(r){ return r.json(); }).then(function(j){
@@ -187,10 +368,11 @@ input[type=range]:disabled{opacity:.35}
       ruimtes = j.ruimtes.map(function(r){ return bezig[r.id] && oud[r.id] ? oud[r.id] : r; });
       stip('', 'Bijgewerkt ' + new Date().toLocaleTimeString('nl-NL'));
       teken();
+      meld('geladen: gekoppeld, ' + ruimtes.length + ' ruimtes, ' + innerWidth + 'x' + innerHeight);
     }).catch(function(e){
+      meld('fout bij ophalen: ' + (e.message || e));
       stip('fout', String(e.message || e));
-      if (!ruimtes.length) $('raster').innerHTML = '<div class="leeg">Kan de lampen niet bereiken.<br><small>' + esc(e.message || e) + '</small></div>';
-      else melding('Geen verbinding: ' + (e.message || e));
+      melding((ruimtes.length ? 'Geen verbinding: ' : 'Kan de lampen niet bereiken: ') + (e.message || e));
     });
   }
 
@@ -203,6 +385,7 @@ input[type=range]:disabled{opacity:.35}
       if (!j.ok) throw new Error(j.fout || 'Onbekende fout');
       var mis = (j.resultaat || []).filter(function(x){ return !x.ok; });
       if (mis.length) melding(mis.length + ' lamp' + (mis.length > 1 ? 'en reageerden' : ' reageerde') + ' niet');
+      gemeld = ''; meld('geschakeld: ' + ids.length + ' lamp(en)' + (mis.length ? ', ' + mis.length + ' zonder reactie' : ''));
     });
   }
 
@@ -226,8 +409,9 @@ input[type=range]:disabled{opacity:.35}
       });
   }
 
-  /* ---------- Tekenen ---------- */
+  /* ---------- Hulpjes ---------- */
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function norm(s){ return String(s || '').trim().toLowerCase(); }
   function aantalAan(r){ return r.lamps.filter(function(l){ return l.on; }).length; }
   function gemHelder(r){
     var a = r.lamps.filter(function(l){ return l.on && l.bright != null; });
@@ -235,67 +419,183 @@ input[type=range]:disabled{opacity:.35}
     if (!a.length) return null;
     return Math.round(a.reduce(function(s,l){ return s + l.bright; }, 0) / a.length);
   }
+  function vind(id){ for (var i = 0; i < ruimtes.length; i++) if (ruimtes[i].id === id) return ruimtes[i]; return null; }
+  function standTekst(r){
+    var n = aantalAan(r), tot = r.lamps.length;
+    var offline = r.lamps.filter(function(l){ return !l.online; }).length;
+    if (offline === tot) return 'Offline';
+    return n === 0 ? 'Uit' : n === tot ? 'Aan' : n + ' van ' + tot;
+  }
+  /* De ruimte uit de app die bij een kamer op de plattegrond hoort. */
+  function ruimteVan(k){
+    var namen = [k.naam].concat(k.ook || []).map(norm);
+    for (var i = 0; i < ruimtes.length; i++) if (namen.indexOf(norm(ruimtes[i].name)) >= 0) return ruimtes[i];
+    return null;
+  }
+  var paneelSinds = 0;
+  function openPaneel(id){ open = id; paneelSinds = Date.now(); tekenPaneel(); $('paneel').classList.add('open'); }
 
-  function kolommen(n){
-    var w = innerWidth;
-    if (w < 640) return 1;
-    if (n <= 2) return n;
-    if (n <= 4) return 2;
-    if (n <= 6 || w < 900) return 3;
-    return 4;
+  /* Gebaren op een element:
+       o.kort()        kort tikken
+       o.lang()        ruim een halve seconde vasthouden
+       o.sleep(x, y)   vegen (optioneel); o.staand = true: omhoog/omlaag i.p.v. links/rechts
+       o.sleepEind()   vinger los na het vegen */
+  var HEEFT_TOUCH = 'ontouchstart' in window;
+  function gebaar(el, o){
+    var timer = null, x0 = 0, y0 = 0, actief = false, sleept = false, wasLang = false, onderdruk = false;
+    function begin(x, y){
+      actief = true; sleept = false; wasLang = false; x0 = x; y0 = y;
+      clearTimeout(timer);
+      timer = setTimeout(function(){ if (actief && !sleept) { wasLang = true; o.lang(); } }, 550);
+    }
+    function beweeg(x, y, e){
+      if (!actief || wasLang || !o.sleep) return;
+      if (!sleept) {
+        if (Math.abs(o.staand ? y - y0 : x - x0) < 14) return;
+        sleept = true; clearTimeout(timer);
+      }
+      if (e && e.cancelable) e.preventDefault();
+      o.sleep(x, y);
+    }
+    function eind(){
+      if (!actief) return;
+      actief = false; clearTimeout(timer);
+      if (sleept) {
+        onderdruk = true; setTimeout(function(){ onderdruk = false; }, 400);
+        if (o.sleepEind) o.sleepEind();
+      }
+    }
+    if (HEEFT_TOUCH) {
+      el.addEventListener('touchstart', function(e){ var t = e.touches[0]; begin(t.clientX, t.clientY); });
+      el.addEventListener('touchmove', function(e){ var t = e.touches[0]; beweeg(t.clientX, t.clientY, e); }, { passive: false });
+      el.addEventListener('touchend', eind);
+      el.addEventListener('touchcancel', eind);
+    }
+    // Muis (en aanraakschermen zonder touch-events) via pointer-events
+    el.addEventListener('pointerdown', function(e){
+      if (HEEFT_TOUCH && e.pointerType === 'touch') return;
+      begin(e.clientX, e.clientY);
+      var mee = function(ev){ beweeg(ev.clientX, ev.clientY, ev); };
+      var los = function(){ removeEventListener('pointermove', mee); removeEventListener('pointerup', los); removeEventListener('pointercancel', los); eind(); };
+      addEventListener('pointermove', mee); addEventListener('pointerup', los); addEventListener('pointercancel', los);
+    });
+    el.addEventListener('click', function(){
+      if (wasLang || onderdruk) { wasLang = false; onderdruk = false; return; }
+      o.kort();
+    });
+    el.addEventListener('contextmenu', function(e){ e.preventDefault(); });
   }
 
-  function teken(){
-    var el = $('raster');
-    if (!ruimtes.length) { el.innerHTML = '<div class="leeg">Geen lampen gevonden.</div>'; return; }
-    var k = kolommen(ruimtes.length), rijen = Math.ceil(ruimtes.length / k);
-    el.style.gridTemplateColumns = 'repeat(' + k + ',minmax(0,1fr))';
-    el.style.gridAutoRows = rijen <= 3 ? 'minmax(150px,1fr)' : '160px';
+  /* ---------- Plattegrond opbouwen (eenmalig) ---------- */
+  function muurPad(punten, r){
+    var n = punten.length, d = '';
+    function naar(a, b, afstand){
+      var dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1;
+      return [a[0] + dx / len * afstand, a[1] + dy / len * afstand];
+    }
+    for (var i = 0; i < n; i++) {
+      var vorig = punten[(i + n - 1) % n], p = punten[i], volgend = punten[(i + 1) % n];
+      var a = naar(p, vorig, r), b = naar(p, volgend, r);
+      d += (i ? 'L' : 'M') + a[0] + ' ' + a[1] + 'Q' + p[0] + ' ' + p[1] + ' ' + b[0] + ' ' + b[1];
+    }
+    return d + 'Z';
+  }
+  function u(n){ return 'calc(var(--u)*' + n + ')'; }
 
-    // Bestaande tegels hergebruiken zodat een schuifregelaar niet wegspringt tijdens het slepen
-    var bestaand = {};
-    Array.prototype.forEach.call(el.querySelectorAll('.tegel'), function(t){ bestaand[t.dataset.id] = t; });
-    var leeg = el.querySelector('.leeg'); if (leeg) leeg.remove();
-
-    ruimtes.forEach(function(r, i){
-      var t = bestaand[r.id];
-      if (!t) { t = maakTegel(r); }
-      delete bestaand[r.id];
-      if (el.children[i] !== t) el.insertBefore(t, el.children[i] || null);
-      werkTegelBij(t, r);
+  function bouwPlan(){
+    var P = PLATTEGROND, el = $('plan');
+    el.innerHTML = '<svg class="muur" viewBox="0 0 ' + P.breedte + ' ' + P.hoogte + '" preserveAspectRatio="none"><path d="' + muurPad(P.muur, 12) + '"/></svg>';
+    P.kamers.forEach(function(k){
+      var d = document.createElement('section');
+      d.className = 'kamer' + (k.licht === 'vol' ? ' vol' : '') + (k.draai ? ' draai' : '') + (k.hal ? ' hal' : '');
+      d.style.left = u(k.x); d.style.top = u(k.y); d.style.width = u(k.w); d.style.height = u(k.h);
+      d.style.setProperty('--bx', u(k.lamp[0])); d.style.setProperty('--by', u(k.lamp[1]));
+      d.innerHTML = '<span class="balk"></span><span class="naam"></span><button class="knop" aria-label="Aan/uit">' + ICOON.lamp + '</button><span class="status"></span>';
+      var naam = d.querySelector('.naam'), knop = d.querySelector('.knop'), status = d.querySelector('.status');
+      naam.textContent = k.naam;
+      naam.style.left = u(k.tekst[0]); naam.style.top = u(k.tekst[1]);
+      knop.style.left = u(k.lamp[0]); knop.style.top = u(k.lamp[1]);
+      status.style.left = u(k.status[0]); status.style.top = u(k.status[1]);
+      // Tik ergens in de kamer: alles aan/uit. Lang indrukken: helderheid en losse lampen.
+      // Vegen: de kamer is een helderheidsbalk (links dim, rechts fel; staande kamer: onder dim, boven fel).
+      var balk = d.querySelector('.balk');
+      gebaar(d, {
+        staand: !!k.draai,
+        kort: function(){
+          var r = ruimteVan(k);
+          if (!r) { melding('Geen lampen gevonden voor ' + k.naam); return; }
+          wijzig(r, r.lamps, aantalAan(r) === 0, null);
+        },
+        lang: function(){
+          var r = ruimteVan(k);
+          if (r) openPaneel(r.id); else melding('Geen lampen gevonden voor ' + k.naam);
+        },
+        sleep: function(x, y){
+          var r = ruimteVan(k);
+          if (!r || gemHelder(r) == null) return;
+          var b = d.getBoundingClientRect();
+          var f = k.draai ? (b.bottom - y) / b.height : (x - b.left) / b.width;
+          var v = Math.max(1, Math.min(100, Math.round((f - 0.06) / 0.88 * 100)));
+          k.dim = v;
+          clearTimeout(k.dimTimer);
+          d.classList.add('dimt'); d.classList.add('aan');
+          if (k.draai) balk.style.height = v + '%'; else balk.style.width = v + '%';
+          d.style.setProperty('--gloed', (0.5 + 0.5 * v / 100).toFixed(2));
+          status.textContent = v + '%';
+        },
+        sleepEind: function(){
+          var r = ruimteVan(k), v = k.dim;
+          k.dim = null;
+          k.dimTimer = setTimeout(function(){ d.classList.remove('dimt'); }, 900);
+          if (r && v != null) wijzig(r, r.lamps, null, v); else teken();
+        }
+      });
+      k.el = d;
+      el.appendChild(d);
     });
-    Object.keys(bestaand).forEach(function(id){ bestaand[id].remove(); });
+  }
+
+  /* ---------- Tekenen ---------- */
+  function teken(){
+    var gebruikt = {};
+    PLATTEGROND.kamers.forEach(function(k){
+      var r = ruimteVan(k), d = k.el;
+      if (r) gebruikt[r.id] = true;
+      if (k.dim != null) return;   // er wordt geveegd: de balk niet overschrijven
+      var n = r ? aantalAan(r) : 0, h = r ? gemHelder(r) : null;
+      d.classList.toggle('leeg', !r);
+      d.classList.toggle('aan', n > 0);
+      d.classList.toggle('bezig', !!(r && bezig[r.id]));
+      d.style.setProperty('--gloed', n > 0 ? (0.5 + 0.5 * (h == null ? 1 : h / 100)).toFixed(2) : 0);
+      d.querySelector('.status').textContent = r ? standTekst(r) : '–';
+    });
+    tekenOverig(ruimtes.filter(function(r){ return !gebruikt[r.id]; }));
     if (open) tekenPaneel();
   }
 
-  function maakTegel(r){
-    var t = document.createElement('section');
-    t.className = 'tegel'; t.dataset.id = r.id;
-    t.innerHTML = '<div class="kop"><div class="naam"><b></b><span></span></div>' +
-      '<button class="aanuit" aria-label="Aan/uit">' + ICOON + '</button></div>' +
-      '<div class="dim"><input type="range" min="1" max="100" step="1"><span class="pct"></span></div>';
-    t.querySelector('.aanuit').addEventListener('click', function(){
-      var ruimte = vind(t.dataset.id); if (!ruimte) return;
-      wijzig(ruimte, ruimte.lamps, aantalAan(ruimte) === 0, null);
+  /* Ruimtes uit de app die niet op de plattegrond staan: als knopjes linksonder. */
+  function tekenOverig(lijst){
+    var el = $('overig');
+    var sleutel = lijst.map(function(r){ return r.id; }).join('|');
+    if (el.dataset.sleutel !== sleutel) {
+      el.dataset.sleutel = sleutel; el.innerHTML = '';
+      lijst.forEach(function(r){
+        var b = document.createElement('button');
+        b.className = 'chip'; b.dataset.id = r.id;
+        b.innerHTML = ICOON.lamp + '<span></span><small></small>';
+        gebaar(b, {
+          kort: function(){ var ru = vind(b.dataset.id); if (ru) wijzig(ru, ru.lamps, aantalAan(ru) === 0, null); },
+          lang: function(){ openPaneel(b.dataset.id); }
+        });
+        el.appendChild(b);
+      });
+    }
+    lijst.forEach(function(r, i){
+      var b = el.children[i];
+      b.classList.toggle('aan', aantalAan(r) > 0);
+      b.querySelector('span').textContent = r.name;
+      b.querySelector('small').textContent = standTekst(r);
     });
-    t.querySelector('.naam').addEventListener('click', function(){ open = t.dataset.id; tekenPaneel(); $('paneel').classList.add('open'); });
-    koppelSchuif(t.querySelector('input'), t.querySelector('.pct'), function(v){
-      var ruimte = vind(t.dataset.id); if (ruimte) wijzig(ruimte, ruimte.lamps, null, v);
-    });
-    return t;
-  }
-
-  function werkTegelBij(t, r){
-    var n = aantalAan(r), tot = r.lamps.length, h = gemHelder(r);
-    var offline = r.lamps.filter(function(l){ return !l.online; }).length;
-    t.classList.toggle('aan', n > 0);
-    t.classList.toggle('bezig', !!bezig[r.id]);
-    t.style.setProperty('--gloed', n > 0 ? (0.35 + 0.65 * (h == null ? 1 : h / 100)).toFixed(2) : 0);
-    t.querySelector('.naam b').textContent = r.name;
-    t.querySelector('.naam span').textContent =
-      (n === 0 ? 'Uit' : n === tot ? (tot === 1 ? 'Aan' : 'Alle ' + tot + ' aan') : n + ' van ' + tot + ' aan') +
-      (offline ? ' · ' + offline + ' offline' : '');
-    zetSchuif(t.querySelector('input'), t.querySelector('.pct'), h);
   }
 
   function zetSchuif(inp, pct, h){
@@ -305,7 +605,6 @@ input[type=range]:disabled{opacity:.35}
     inp.style.setProperty('--v', (h == null ? 0 : h) + '%');
     pct.textContent = h == null ? '' : h + '%';
   }
-
   function koppelSchuif(inp, pct, klaar){
     inp.addEventListener('input', function(){
       inp.dataset.sleept = '1';
@@ -314,19 +613,24 @@ input[type=range]:disabled{opacity:.35}
     inp.addEventListener('change', function(){ delete inp.dataset.sleept; klaar(Number(inp.value)); });
   }
 
-  function vind(id){ for (var i = 0; i < ruimtes.length; i++) if (ruimtes[i].id === id) return ruimtes[i]; return null; }
-
-  /* ---------- Paneel met losse lampen ---------- */
+  /* ---------- Paneel: hele ruimte + losse lampen ---------- */
+  var RIJ = '<div class="dim"><input type="range" min="1" max="100" step="1"><span class="pct"></span></div>';
   function tekenPaneel(){
     var r = vind(open); if (!r) { sluitPaneel(); return; }
     $('velNaam').textContent = r.name;
+    $('velKop').classList.toggle('aan', aantalAan(r) > 0);
     var lijst = $('lampen');
-    if (lijst.dataset.ruimte !== r.id || lijst.children.length !== r.lamps.length) {
+    if (lijst.dataset.ruimte !== r.id || lijst.children.length !== r.lamps.length + 1) {
       lijst.dataset.ruimte = r.id; lijst.innerHTML = '';
+      var g = document.createElement('div'); g.className = 'lamp geheel';
+      g.innerHTML = '<div class="ln">Hele ruimte</div>' + RIJ;
+      koppelSchuif(g.querySelector('input'), g.querySelector('.pct'), function(v){
+        var ru = vind(open); if (ru) wijzig(ru, ru.lamps, null, v);
+      });
+      lijst.appendChild(g);
       r.lamps.forEach(function(l){
         var d = document.createElement('div'); d.className = 'lamp'; d.dataset.id = l.id;
-        d.innerHTML = '<div class="ln"></div><button class="schakel" aria-label="Aan/uit"></button>' +
-          '<div class="dim"><input type="range" min="1" max="100" step="1"><span class="pct"></span></div>';
+        d.innerHTML = '<div class="ln"></div><button class="schakel" aria-label="Aan/uit"></button>' + RIJ;
         d.querySelector('.schakel').addEventListener('click', function(){
           var ru = vind(open), la = ru && ru.lamps.filter(function(x){ return x.id === l.id; })[0];
           if (la) wijzig(ru, [la], !la.on, null);
@@ -338,8 +642,11 @@ input[type=range]:disabled{opacity:.35}
         lijst.appendChild(d);
       });
     }
+    var geheel = lijst.children[0], h = gemHelder(r);
+    geheel.style.display = h == null ? 'none' : '';
+    zetSchuif(geheel.querySelector('input'), geheel.querySelector('.pct'), h);
     r.lamps.forEach(function(l, i){
-      var d = lijst.children[i];
+      var d = lijst.children[i + 1];
       d.classList.toggle('aan', l.on); d.classList.toggle('offline', !l.online);
       d.querySelector('.ln').innerHTML = esc(l.name) + (l.online ? '' : '<small>offline</small>');
       d.querySelector('.dim').style.display = l.bright == null ? 'none' : '';
@@ -348,15 +655,51 @@ input[type=range]:disabled{opacity:.35}
   }
   function sluitPaneel(){ open = null; $('paneel').classList.remove('open'); }
   $('sluit').addEventListener('click', sluitPaneel);
-  $('paneel').addEventListener('click', function(e){ if (e.target === $('paneel')) sluitPaneel(); });
+  // Niet meteen weer sluiten door het loslaten van de lange druk waarmee het paneel openging
+  $('paneel').addEventListener('click', function(e){ if (e.target === $('paneel') && Date.now() - paneelSinds > 600) sluitPaneel(); });
+  $('velSchakel').addEventListener('click', function(){
+    var r = vind(open); if (r) wijzig(r, r.lamps, aantalAan(r) === 0, null);
+  });
 
   /* ---------- Alles uit ---------- */
   $('allesUit').addEventListener('click', function(){
-    ruimtes.forEach(function(r){ if (aantalAan(r)) wijzig(r, r.lamps, false, null); });
+    var iets = false;
+    ruimtes.forEach(function(r){ if (aantalAan(r)) { iets = true; wijzig(r, r.lamps, false, null); } });
+    if (!iets) melding('Alle lampen zijn al uit');
   });
-  // Lang indrukken op de titel: lijst met lampen/ruimtes opnieuw ophalen
+  /* ---------- Partyknop: scène 'party' aan, nog een keer = scène 'standaard' ---------- */
   (function(){
-    var t; var el = document.querySelector('.titel');
+    var knop = $('party'), aan = false, bezigMet = false;
+    knop.innerHTML = ICOON.disco;
+    try { aan = localStorage.getItem('lampen_party') === '1'; } catch (e) {}
+    function toon(){ knop.classList.toggle('aan', aan); knop.classList.toggle('bezig', bezigMet); }
+    function onthoud(){ try { localStorage.setItem('lampen_party', aan ? '1' : '0'); } catch (e) {} }
+    function start(naam){
+      if (DEMO) return new Promise(function(ok){ setTimeout(ok, 350); });
+      return fetch(API, { method:'POST', body: JSON.stringify({ key: KEY, action: 'scene', name: naam }) })
+        .then(function(r){ return r.json(); })
+        .then(function(j){ if (!j.ok) throw new Error(j.fout || 'Onbekende fout'); });
+    }
+    knop.addEventListener('click', function(){
+      if (bezigMet) return;
+      var naar = !aan, naam = naar ? SCENES.party : SCENES.standaard;
+      aan = naar; bezigMet = true; toon();
+      start(naam).then(function(){
+        onthoud();
+        gemeld = ''; meld('scène gestart: ' + naam);
+        clearTimeout(bijwerkTimer); bijwerkTimer = setTimeout(function(){ haalStand(); }, 3500);
+      }).catch(function(e){
+        aan = !naar;
+        melding('Scène "' + naam + '" mislukt: ' + (e.message || e));
+        gemeld = ''; meld('scène mislukt: ' + naam + ' – ' + (e.message || e));
+      }).then(function(){ bezigMet = false; toon(); });
+    });
+    toon();
+  })();
+
+  // Lang indrukken op de klok: lijst met lampen/ruimtes opnieuw ophalen
+  (function(){
+    var t; var el = $('klok');
     el.addEventListener('pointerdown', function(){ t = setTimeout(function(){ melding('Lampen opnieuw ophalen…'); haalStand(true); }, 900); });
     ['pointerup','pointerleave','pointercancel'].forEach(function(n){ el.addEventListener(n, function(){ clearTimeout(t); }); });
   })();
@@ -364,21 +707,26 @@ input[type=range]:disabled{opacity:.35}
   /* ---------- Demo ---------- */
   function demoData(){
     $('demo').hidden = false;
+    if (!LAT || !LON) toonWeer(12, 3);
     function L(id, name, on, b){ return { id:id, name:name, online:true, on:on, bright:b }; }
     return [
-      { id:'woon', name:'Woonkamer', lamps:[L('w1','Plafond',true,80), L('w2','Staande lamp',true,60), L('w3','Lichtstrip tv',true,40)] },
-      { id:'keuken', name:'Keuken', lamps:[L('k1','Spots',true,100), L('k2','Eettafel',false,70)] },
-      { id:'slaap', name:'Slaapkamer', lamps:[L('s1','Plafond',false,50), L('s2','Nachtlampje',false,20)] },
-      { id:'gang', name:'Gang', lamps:[L('g1','Hal',false,100)] },
-      { id:'badkamer', name:'Badkamer', lamps:[L('b1','Spiegel',false,100), { id:'b2', name:'Plafond', online:false, on:false, bright:100 }] },
-      { id:'tuin', name:'Tuin', lamps:[L('t1','Lichtsnoer',true,30)] }
+      { id:'slaap', name:'Slaapkamer', lamps:[L('s1','Plafond',true,100), L('s2','Nachtlampje',true,60)] },
+      { id:'hal', name:'Hal', lamps:[L('h1','Plafond',false,100)] },
+      { id:'keuken', name:'Keuken', lamps:[L('k1','Spots',false,100), L('k2','Aanrecht',false,70)] },
+      { id:'kast', name:'Kast', lamps:[L('c1','Plafond',false,null)] },
+      { id:'woon', name:'Woonkamer', lamps:[L('w1','Plafond',true,80), L('w2','Staande lamp',true,60), L('w3','Lichtstrip tv',true,40)] }
     ];
   }
 
   /* ---------- Start ---------- */
-  addEventListener('resize', teken);
+  maat();
+  bouwPlan();
+  addEventListener('resize', maat);
   haalStand();
   if (!DEMO) setInterval(haalStand, POLL);
+  weer(); setInterval(weer, 15 * 60 * 1000);
+  // Tablet of telefoon die weer wakker wordt: meteen de actuele stand en tijd tonen
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) { klok(); if (!DEMO) haalStand(); } });
   // Elke 6 uur vers laden, zodat updates van de pagina vanzelf binnenkomen
   setTimeout(function(){ location.reload(); }, 6 * 3600 * 1000);
 })();

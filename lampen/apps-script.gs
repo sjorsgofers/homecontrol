@@ -60,8 +60,10 @@ function verwerk_(p) {
       CacheService.getScriptCache().remove('status');
       return { ok: true, resultaat: res };
     }
+    if (p.action === 'scene') return { ok: true, scene: startScene_(p.name) };
+    if (p.action === 'scenes') return { ok: true, scenes: scenes_().map(function (s) { return s.name; }) };
     if (p.action === 'refresh') {
-      CacheService.getScriptCache().removeAll(['apparaten', 'status']);
+      CacheService.getScriptCache().removeAll(['apparaten', 'status', 'scenes', 'huizen']);
     }
     return { ok: true, ruimtes: stand_() };
   } catch (err) {
@@ -71,7 +73,7 @@ function verwerk_(p) {
 
 /* Handig om in de editor te draaien: logt wat er gevonden wordt. */
 function test() {
-  CacheService.getScriptCache().removeAll(['apparaten', 'status', 'tuya_token']);
+  CacheService.getScriptCache().removeAll(['apparaten', 'status', 'tuya_token', 'scenes', 'huizen']);
   var r = stand_();
   r.forEach(function (ruimte) {
     Logger.log('== ' + ruimte.name + ' ==');
@@ -80,6 +82,10 @@ function test() {
         '  ' + (l.on ? 'aan' : 'uit') + (l.bright != null ? '  ' + l.bright + '%' : ''));
     });
   });
+  try {
+    Logger.log('== Scenes ==');
+    scenes_().forEach(function (s) { Logger.log('  ' + s.name); });
+  } catch (err) { Logger.log('  Scenes ophalen mislukt: ' + err.message); }
 }
 
 /* ------------------------ stand van zaken ------------------------ */
@@ -234,6 +240,55 @@ function schakel_(ids, aan, helderProcent) {
     try { j = JSON.parse(a.getContentText()); } catch (e) {}
     return { id: volgorde[i], ok: !!j.success, fout: j.success ? undefined : (j.msg || a.getResponseCode()) };
   });
+}
+
+/* ----------------------------- scenes ----------------------------- */
+
+/* Huizen (homes) van de gekoppelde app-account(s); 6 uur gecachet. */
+function huizen_() {
+  var cache = CacheService.getScriptCache();
+  var c = cache.get('huizen');
+  if (c) return JSON.parse(c);
+  var uids = {};
+  apparaten_().lampen.forEach(function (l) { if (l.uid) uids[l.uid] = true; });
+  var ids = [];
+  Object.keys(uids).forEach(function (uid) {
+    (tuya_('GET', '/v1.0/users/' + uid + '/homes') || []).forEach(function (h) { ids.push(String(h.home_id)); });
+  });
+  cache.put('huizen', JSON.stringify(ids), 21600);
+  return ids;
+}
+
+/* De tik-om-te-starten-scenes uit de app; 10 minuten gecachet. */
+function scenes_() {
+  var cache = CacheService.getScriptCache();
+  var c = cache.get('scenes');
+  if (c) return JSON.parse(c);
+  var uit = [];
+  huizen_().forEach(function (home) {
+    (tuya_('GET', '/v1.1/homes/' + home + '/scenes') || []).forEach(function (s) {
+      uit.push({ id: s.scene_id, name: s.name, home: home });
+    });
+  });
+  cache.put('scenes', JSON.stringify(uit), 600);
+  return uit;
+}
+
+/* Start een scene op naam (hoofdletters maken niet uit). */
+function startScene_(naam) {
+  var zoek = String(naam || '').trim().toLowerCase();
+  function vind() {
+    return scenes_().filter(function (s) { return String(s.name).trim().toLowerCase() === zoek; })[0];
+  }
+  var s = vind();
+  if (!s) { CacheService.getScriptCache().remove('scenes'); s = vind(); }
+  if (!s) {
+    throw new Error('Scene "' + naam + '" bestaat niet. Wel: ' +
+      (scenes_().map(function (x) { return x.name; }).join(', ') || 'geen'));
+  }
+  tuya_('POST', '/v1.0/homes/' + s.home + '/scenes/' + s.id + '/trigger');
+  CacheService.getScriptCache().remove('status');
+  return s.name;
 }
 
 /* --------------------------- helderheid --------------------------- */
