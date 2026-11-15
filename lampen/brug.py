@@ -464,11 +464,31 @@ def schakel(ids, aan, helder, temp=None, kleur=None):
     return [resultaat.get(i, {"id": i, "ok": False, "fout": "onbekende lamp"}) for i in ids]
 
 
-def verwerk(p):
+MISLUKT = {}            # afzender -> tijdstippen van foute sleutels
+MAX_FOUT = 5            # zoveel foute sleutels ...
+FOUT_VENSTER = 900      # ... binnen zoveel seconden: daarna tot het venster voorbij is alles weigeren
+
+
+def geblokkeerd(afzender):
+    nu = time.time()
+    lijst = [t for t in MISLUKT.get(afzender, []) if nu - t < FOUT_VENSTER]
+    MISLUKT[afzender] = lijst
+    return len(lijst) >= MAX_FOUT
+
+
+def verwerk(p, afzender="onbekend"):
     actie = p.get("action") or "state"
     if actie == "ping":
         return {"ok": True, "brug": True}
+    # Rem op raden van de sleutel (de brug kan vanaf internet bereikbaar zijn)
+    if afzender != "onbekend" and geblokkeerd(afzender):
+        return {"ok": False, "fout": "Te veel pogingen, probeer het later opnieuw"}
     if not hmac.compare_digest(str(p.get("key") or ""), str(CFG["key"])):
+        MISLUKT.setdefault(afzender, []).append(time.time())
+        if len(MISLUKT) > 5000:
+            MISLUKT.clear()
+        time.sleep(1)
+        log(f"foute sleutel van {afzender}")
         return {"ok": False, "fout": "Onjuiste sleutel"}
     if actie == "set":
         ids = p.get("ids") or []
@@ -530,8 +550,9 @@ class Verzoek(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Private-Network", "true")
 
     def _antwoord(self, p):
+        afzender = (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or "onbekend"
         try:
-            uit = verwerk(p)
+            uit = verwerk(p, afzender)
         except Exception as e:
             uit = {"ok": False, "fout": str(e)}
         data = json.dumps(uit).encode("utf-8")
