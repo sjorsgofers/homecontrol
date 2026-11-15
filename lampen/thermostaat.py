@@ -87,6 +87,15 @@ class Thermostaat:
                       password=self.cfg["nefit_wachtwoord"], message_callback=self._bericht)
         c.failed_auth_handler = mislukt
         c.session_end_callback = None
+        if self.cfg.get("nefit_certificaat_controleren") is False:
+            # De Bosch-server stuurt zijn tussencertificaat niet mee, waardoor Python de keten
+            # niet kan controleren. Op verzoek: controle uit voor alleen deze verbinding.
+            # De berichten zelf blijven versleuteld met toegangscode en wachtwoord.
+            import ssl
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            c.xmppclient.ssl_context = ctx
         await c.connect()
         for _ in range(150):
             if c.xmppclient.connected_event.is_set() or fouten:
