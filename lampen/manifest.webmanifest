@@ -1,7 +1,7 @@
 {
-  "name": "Lampen",
-  "short_name": "Lampen",
-  "description": "Lampen per ruimte bedienen op een plattegrond",
+  "name": "Thuis",
+  "short_name": "Thuis",
+  "description": "De woning bedienen op een plattegrond: lampen, thermostaat, stofzuiger en intercom",
   "display": "standalone",
   "orientation": "landscape",
   "background_color": "#f5f0e6",

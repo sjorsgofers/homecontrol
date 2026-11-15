@@ -176,13 +176,43 @@ class Intercom:
         return True
 
 
+def _vraag_wachtwoord(vraag):
+    """Wachtwoord vragen met een sterretje per teken, zodat je ziet dat het typen aankomt."""
+    try:
+        import msvcrt
+    except ImportError:
+        return getpass.getpass(vraag)
+    sys.stdout.write(vraag)
+    sys.stdout.flush()
+    tekens = []
+    while True:
+        c = msvcrt.getwch()
+        if c in ("\r", "\n"):
+            break
+        if c == "\x03":
+            raise KeyboardInterrupt
+        if c in ("\x00", "\xe0"):       # pijltjes en functietoetsen: tweede deel overslaan
+            msvcrt.getwch()
+            continue
+        if c in ("\b", "\x7f"):
+            if tekens:
+                tekens.pop()
+                sys.stdout.write("\b \b")
+        elif c >= " ":
+            tekens.append(c)
+            sys.stdout.write("*")
+        sys.stdout.flush()
+    sys.stdout.write("\n")
+    return "".join(tekens)
+
+
 def inloggen(map_):
     """Vraagt zelf om e-mailadres, wachtwoord en code; bewaart alleen het token."""
     from ring_doorbell import Auth, AuthenticationError, Requires2FAError
 
     async def doe():
         email = input("E-mailadres van je Ring-account: ").strip()
-        wachtwoord = getpass.getpass("Wachtwoord (wordt niet getoond en niet bewaard): ")
+        wachtwoord = _vraag_wachtwoord("Wachtwoord (verschijnt als sterretjes, wordt niet bewaard): ")
         auth = Auth(AGENT, None, lambda t: _schrijf(_pad(map_, "ring-token.json"), t))
         try:
             try:
