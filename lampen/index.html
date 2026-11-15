@@ -13,7 +13,6 @@
 <link rel="apple-touch-icon" href="icoon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cpath d=%22M12 2.5 1.5 12H5v9.5h5v-6h4v6h5V12h3.5z%22 fill=%22%23f6cf4f%22 stroke=%22%23f6cf4f%22 stroke-width=%221%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
-<script>try{if(localStorage.getItem('lampen_thema')==='donker')document.documentElement.className='donker';}catch(e){}</script>
 <style>
 /* Alle maten hangen aan twee eenheden die het script bij het laden/draaien zet:
    --s  schaal van de linkerkolom (1px op een scherm van 1024 breed)
@@ -24,7 +23,7 @@
   --schaduw:calc(var(--s)*8) calc(var(--s)*9) calc(var(--s)*20) var(--schaduw-d),
             calc(var(--s)*-6) calc(var(--s)*-6) calc(var(--s)*16) var(--schaduw-l);
 
-  /* Licht thema (standaard): off-white, dune sand, warm clay en espresso */
+  /* Kleuren: off-white, dune sand, warm clay en espresso */
   --bg:#f5f0e6; --bg-grad:radial-gradient(ellipse 95% 85% at 28% 18%,#fcf9f3 0%,#f5f0e6 52%,#ece4d6 100%);
   --vlak:#f6f1e8; --diep:#e9e0d1;
   --kamer:#e4d2bb; --hal:#d6bfa3; --muur:#40332b;
@@ -49,33 +48,6 @@
   --w-zon:#c9825f; --w-maan:#40332b; --w-wolk:#d4bea4; --w-wolk-donker:#a58f79;
   --w-drup:#8a7566; --w-vlok:#b3a191; --w-bliksem:#b9735a;
   --party-uit:#a8978a; --party-aan:#a35f47; --party-aan-bg:linear-gradient(160deg,#ecd6c8,#e2c2af);
-}
-/* Donker thema: donkerblauw met warm geel licht */
-html.donker{
-  --bg:#172135; --bg-grad:radial-gradient(ellipse 95% 85% at 28% 18%,#1e2a43 0%,#172135 52%,#121a2b 100%);
-  --vlak:#1c2740; --diep:#141c2e;
-  --kamer:#25334f; --hal:#3a4864; --muur:#1c2842;
-  --txt:#f2f5fa; --muted:rgba(226,232,244,.62); --faint:rgba(226,232,244,.32);
-  --accent:#f6cf4f; --accent-tekst:#f6cf4f; --rood:#e58a70;
-  --accent-grad:linear-gradient(160deg,#ffeb9c 0%,#f3c440 100%); --accent-ink:#4a3a08;
-  --accent-gloed:rgba(255,216,96,.55); --accent-schaduw:rgba(110,84,10,.35);
-  --schaduw-d:rgba(6,10,20,.62); --schaduw-l:rgba(92,114,158,.12);
-  --inzet-d:rgba(4,7,14,.7); --inzet-l:rgba(92,114,158,.14);
-  --ink-zacht:#9aa7c0; --chip-aan:linear-gradient(160deg,#4a4630,#2c3040);
-  --muur-d:rgba(5,9,18,.62); --muur-l:rgba(92,114,158,.11);
-  --kamer-l:rgba(255,255,255,.05); --kamer-d:rgba(8,12,24,.22);
-  --gloed-1:rgba(255,231,140,.84); --gloed-2:rgba(228,199,102,.62); --gloed-3:rgba(160,150,90,.38); --gloed-4:rgba(60,75,95,0);
-  --vol-grad:linear-gradient(180deg,#fff5c8 0%,#f8e5a2 100%); --vol-ink:#2c2a1f; --vol-pil:rgba(70,58,12,.14);
-  --balk-1:rgba(255,226,130,.08); --balk-2:rgba(255,226,130,.34); --balk-rand:rgba(255,238,175,.85);
-  --volbalk-1:rgba(120,90,10,.05); --volbalk-2:rgba(120,90,10,.22); --volbalk-rand:rgba(120,90,10,.55);
-  --knop-bg:#2b3854; --knop-d:rgba(8,12,24,.5); --knop-l:rgba(130,150,190,.16); --knop-icoon:#8f9cb6;
-  --paneel-achter:rgba(6,10,20,.6); --vel:#182236; --lijn:rgba(255,255,255,.06);
-  --lamp-bg:#1f2b45; --lamp-aan-bg:#2a3147; --lamp-aan-rand:rgba(246,207,79,.45);
-  --schakel-knop:#56627c; --spoor:rgba(255,255,255,.10);
-  --meld-bg:#2a1b1a; --meld-rand:rgba(229,138,112,.5); --meld-txt:#ffd9cf;
-  --w-zon:#f6cf4f; --w-maan:#e9eef8; --w-wolk:#b9c5db; --w-wolk-donker:#8492ad;
-  --w-drup:#8cc0ff; --w-vlok:#eef3fb; --w-bliksem:#ffd84a;
-  --party-uit:#6f7b96; --party-aan:#e2b6ff; --party-aan-bg:linear-gradient(160deg,#3a2f52,#232a44);
 }
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;color:var(--txt);
@@ -323,17 +295,11 @@ input[type=range].warm::-moz-range-progress{background:transparent}
 @keyframes val{0%{transform:translateY(-3px);opacity:0}20%{opacity:1}80%{opacity:1}100%{transform:translateY(7px);opacity:0}}
 @keyframes flits{0%,58%{opacity:0}60%{opacity:1}64%{opacity:.15}68%{opacity:1}80%,100%{opacity:0}}
 
-/* Onderaan op een rij: 'Alle lampen uit', de partyknop en het schakelaartje licht/donker */
+/* Onderaan op een rij: 'Alle lampen uit', de stofzuiger en de partyknop */
 .rij{display:flex;align-items:center;margin-top:calc(var(--s)*16)}
 .rij > * + *{margin-left:calc(var(--s)*12)}
 #party{appearance:none;-webkit-appearance:none;justify-content:center;width:calc(var(--s)*54);height:calc(var(--s)*54);
   margin-top:0;padding:0;cursor:pointer;transition:background .4s}
-#thema{appearance:none;-webkit-appearance:none;position:relative;width:calc(var(--s)*46);height:calc(var(--s)*24);
-  margin-top:0;padding:0;border:0;border-radius:calc(var(--s)*12);background:var(--diep);cursor:pointer;
-  box-shadow:inset calc(var(--s)*1.5) calc(var(--s)*1.5) calc(var(--s)*4) var(--inzet-d),inset calc(var(--s)*-1) calc(var(--s)*-1) calc(var(--s)*3) var(--inzet-l)}
-#thema::after{content:"";position:absolute;top:calc(var(--s)*3);left:calc(var(--s)*3);width:calc(var(--s)*18);height:calc(var(--s)*18);
-  border-radius:50%;background:var(--schakel-knop);transition:transform .3s var(--ease)}
-html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
 #party svg{margin:0;width:calc(var(--s)*26);height:calc(var(--s)*26);stroke:var(--party-uit);stroke-width:1.7;transition:stroke .4s}
 #party.aan{background:var(--party-aan-bg)}
 #party.aan svg{stroke:var(--party-aan);animation:draai 7s linear infinite}
@@ -395,7 +361,6 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
         <button class="uit-knop" id="allesUit"><span class="rond" id="uitIcoon"></span><span>Alle lampen uit</span></button>
         <button class="chip" id="zuiger" aria-label="Stofzuiger" hidden></button>
         <button class="chip" id="party" aria-label="Partymodus"></button>
-        <button id="thema" aria-label="Schakelen tussen licht en donker"></button>
       </div>
     </div>
   </aside>
@@ -1081,22 +1046,6 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     ruimtes.forEach(function(r){ if (aantalAan(r)) { iets = true; wijzig(r, r.lamps, false, null); } });
     if (!iets) melding('Alle lampen zijn al uit');
   });
-  /* ---------- Thema: licht (standaard) of donker, onthouden per apparaat ---------- */
-  (function(){
-    var wortel = document.documentElement;
-    function werkBij(){
-      var m = document.querySelector('meta[name=theme-color]');
-      if (m) m.setAttribute('content', wortel.classList.contains('donker') ? '#172135' : '#f5f0e6');
-    }
-    $('thema').addEventListener('click', function(){
-      var donker = !wortel.classList.contains('donker');
-      wortel.classList.toggle('donker', donker);
-      try { localStorage.setItem('lampen_thema', donker ? 'donker' : 'licht'); } catch (e) {}
-      werkBij();
-    });
-    werkBij();
-  })();
-
   /* ---------- Partyknop: scène 'party' aan, nog een keer = scène 'standaard' ---------- */
   (function(){
     var knop = $('party'), aan = false, bezigMet = false;
