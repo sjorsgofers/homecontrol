@@ -133,6 +133,7 @@ Zonder gegevens in de link toont de pagina voorbeeldlampen (demo).
 - **Kamer lang indrukken**: paneel met helderheid van de hele ruimte en de losse lampen.
 - **Alle lampen uit**: de tegel links.
 - **Klok lang indrukken**: lampen/ruimtes opnieuw ophalen (na een nieuwe lamp).
+- **Schakelaartje onder de partyknop**: licht of donker thema; de keuze wordt per apparaat onthouden.
 - Ruimtes uit de app die niet op de plattegrond staan, verschijnen als knopje linksonder
   (zelfde bediening: tik = aan/uit, lang indrukken = paneel).
 

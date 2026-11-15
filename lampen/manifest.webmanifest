@@ -4,8 +4,8 @@
   "description": "Lampen per ruimte bedienen op een plattegrond",
   "display": "standalone",
   "orientation": "landscape",
-  "background_color": "#172135",
-  "theme_color": "#172135",
+  "background_color": "#f5f0e6",
+  "theme_color": "#f5f0e6",
   "icons": [
     { "src": "icoon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icoon-512.png", "sizes": "512x512", "type": "image/png" }
