@@ -262,7 +262,7 @@ input[type=range].warm::-moz-range-progress{background:transparent}
 #zuiger svg{margin:0;width:calc(var(--s)*38);height:calc(var(--s)*38);stroke:var(--ink-zacht);stroke-width:1.5}
 #zuiger.bezig{background:var(--chip-aan)}
 #zuiger.bezig svg{stroke:var(--accent-tekst);animation:puls 1.4s ease-in-out infinite}
-#thMenu,#zuMenu{position:fixed;left:0;top:0;right:0;bottom:0;z-index:35;display:flex;align-items:center;justify-content:center;
+#thMenu,#zuMenu,#belMenu{position:fixed;left:0;top:0;right:0;bottom:0;z-index:35;display:flex;align-items:center;justify-content:center;
   padding:20px;background:var(--paneel-achter)}
 .th-kaart{width:380px}
 .kaart .th-optie{display:block;width:100%;height:auto;margin-top:10px;padding:14px 16px;text-align:left;border-radius:14px;
@@ -270,6 +270,18 @@ input[type=range].warm::-moz-range-progress{background:transparent}
 .kaart .th-optie small{display:block;margin-top:3px;font-size:13px;color:var(--muted)}
 .kaart .th-optie.actief{border-color:var(--lamp-aan-rand);background:var(--lamp-aan-bg)}
 .thermo.stookt .th-nu b{color:var(--accent-tekst)}
+#belMenu{z-index:40}
+#belMenu .kaart{text-align:center}
+#belMenu .bel-icoon{width:64px;height:64px;margin:4px auto 10px;color:var(--accent-tekst);animation:belt 1s ease-in-out infinite;transform-origin:50% 10%}
+#belMenu .bel-icoon svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#belMenu b{display:block;font-size:24px}
+#belMenu p{margin:6px 0 14px;color:var(--muted)}
+.kaart #belOpen{display:block;width:100%;height:auto;padding:18px 16px;border-radius:14px;font-size:21px;font-weight:600;
+  background:var(--lamp-aan-bg);border:1px solid var(--lamp-aan-rand);color:var(--txt)}
+.kaart #belOpen:disabled{opacity:.55}
+.kaart #belWeg{display:block;width:100%;height:auto;margin-top:10px;padding:12px 16px;border-radius:14px;font-size:16px;
+  background:transparent;border:1px solid var(--lijn);color:var(--muted)}
+@keyframes belt{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(5deg)}}
 
 /* ---------- Meldingen ---------- */
 #melding{position:fixed;left:50%;bottom:18px;z-index:30;max-width:90vw;padding:12px 20px;border-radius:14px;
@@ -411,6 +423,15 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     <button class="th-optie" data-opdracht="start">Start met zuigen<small>het hele huis</small></button>
     <button class="th-optie" data-opdracht="pauze">Pauze<small>blijft staan waar hij is</small></button>
     <button class="th-optie" data-opdracht="thuis">Terug naar het station</button>
+  </div>
+</div>
+<div id="belMenu" hidden>
+  <div class="kaart th-kaart">
+    <div class="bel-icoon"><svg viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 2H4.4z"/><path d="M10 21a2.1 2.1 0 0 0 4 0"/><path d="M12 3v2"/></svg></div>
+    <b>Er wordt aangebeld</b>
+    <p id="belInfo">Beneden bij de voordeur.</p>
+    <button id="belOpen">Deur openen</button>
+    <button id="belWeg">Niet opendoen</button>
   </div>
 </div>
 <div id="melding"></div>
@@ -1244,6 +1265,66 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     });
   });
 
+  /* ---------- Intercom beneden (Ring, via de brug thuis; zie intercom.py) ----------
+     Wordt er aangebeld, dan klinkt er een bel en verschijnt de knop 'Deur openen'. De brug
+     staat dat alleen toe in de eerste minuten na het aanbellen. Zonder brug gebeurt er niets. */
+  var bel = null, belGezien = 0, belTimer = null, geluid = null;
+  // Geluid mag van de browser pas na een aanraking: bij de eerste tik klaarzetten
+  function geluidKlaar(){
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      if (!geluid) geluid = new A();
+      if (geluid.state === 'suspended') geluid.resume();
+    } catch (e) {}
+  }
+  document.addEventListener('pointerdown', geluidKlaar, { passive: true });
+  function dingdong(){
+    if (!geluid) return;
+    try {
+      var nu = geluid.currentTime;
+      [[659.3, 0], [523.3, 0.55], [659.3, 1.5], [523.3, 2.05]].forEach(function(n){
+        var o = geluid.createOscillator(), g = geluid.createGain(), s = nu + n[1];
+        o.type = 'sine'; o.frequency.value = n[0];
+        g.gain.setValueAtTime(0.0001, s);
+        g.gain.exponentialRampToValueAtTime(0.5, s + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, s + 1.1);
+        o.connect(g); g.connect(geluid.destination); o.start(s); o.stop(s + 1.15);
+      });
+    } catch (e) {}
+  }
+  function tekenBel(){
+    var b = bel, open = !!(b && b.ok && b.open_mag && b.gebeld && b.gebeld !== belGezien);
+    if (open && $('belMenu').hidden) { dingdong(); $('belOpen').disabled = false; $('belOpen').textContent = 'Deur openen'; }
+    $('belMenu').hidden = !open;
+    if (open) $('belInfo').textContent = b.geopend ? 'De deur is geopend.' : 'Beneden bij de voordeur. Openen kan nog ' + b.rest + ' seconden.';
+  }
+  function haalBel(){
+    clearTimeout(belTimer);
+    // Snel kijken zolang de brug een intercom kent, anders af en toe
+    function straks(){ belTimer = setTimeout(haalBel, (bel && bel.ok) ? 3000 : 60000); }
+    if (DEMO || !KEY || !BRUG || document.hidden) { straks(); return; }
+    vraag({ action: 'intercom' }).then(function(j){
+      bel = (j && j.intercom && j.intercom.ok) ? j.intercom : null;
+      tekenBel(); straks();
+    }).catch(function(){ bel = null; straks(); });
+  }
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) haalBel(); });
+  $('belWeg').addEventListener('click', function(){ if (bel) belGezien = bel.gebeld; $('belMenu').hidden = true; });
+  $('belOpen').addEventListener('click', function(){
+    var knop = $('belOpen'); knop.disabled = true; knop.textContent = 'Bezig...';
+    vraag({ action: 'intercom', opdracht: 'open' }).then(function(j){
+      if (j && j.ok && j.intercom && j.intercom.geopend) {
+        knop.textContent = 'Deur is open';
+        var welke = j.intercom.gebeld;
+        setTimeout(function(){ belGezien = welke; $('belMenu').hidden = true; }, 2500);
+      } else {
+        knop.disabled = false; knop.textContent = 'Deur openen';
+        melding((j && j.fout) || 'De deur openen is niet gelukt');
+      }
+    }).catch(function(){ knop.disabled = false; knop.textContent = 'Deur openen'; melding('De deur openen is niet gelukt'); });
+  });
+
   /* ---------- Koppelen ----------
      Het adres van het script staat in de pagina (API_URL) of komt uit de link; de sleutel
      vult de gebruiker één keer per apparaat in. Hij staat daarna alleen in dat apparaat. */
@@ -1327,6 +1408,12 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
   haalAgenda(); setInterval(haalAgenda, 10 * 60 * 1000);
   haalThermo(); setInterval(haalThermo, 60 * 1000);
   haalZuiger(); setInterval(haalZuiger, 30 * 1000);
+  // Proefdraaien zonder aan te bellen: zet #beltest in de link (opent de deur niet)
+  if (hs.has('beltest')) setTimeout(function(){
+    clearTimeout(belTimer);
+    bel = { ok: true, gebeld: Date.now(), open_mag: true, rest: 120, geopend: false }; tekenBel();
+  }, 1500);
+  else haalBel();
   setInterval(tekenAgenda, 60 * 1000);   // afgelopen afspraken laten verdwijnen
   // Tablet of telefoon die weer wakker wordt: meteen de actuele stand en tijd tonen
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) { klok(); if (!DEMO) { haalStand(); haalAgenda(); } } });

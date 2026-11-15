@@ -387,6 +387,37 @@ def stofzuiger_lus():
         time.sleep(5)
 
 
+INTERCOM = None
+INTERCOM_FOUT = "niet gekoppeld"
+
+
+def intercom_lus():
+    """Optioneel: Ring Intercom (zie intercom.py). Doet alleen mee als er is ingelogd."""
+    global INTERCOM, INTERCOM_FOUT
+    try:
+        import intercom
+    except Exception as e:
+        log(f"intercom niet beschikbaar: {e}")
+        return
+    if not intercom.gekoppeld(MAP):
+        return
+    while INTERCOM is None:
+        try:
+            i = intercom.Intercom(CFG, MAP, log)
+            log("intercom verbonden: " + str(i.verbind()))
+            INTERCOM = i
+        except Exception as e:
+            INTERCOM_FOUT = str(e)
+            log(f"intercom: {e}")
+            time.sleep(1800)
+    while True:
+        time.sleep(intercom.VERVERS_ELKE)
+        try:
+            INTERCOM.ververs()
+        except Exception as e:
+            log(f"intercom verversen: {e}")
+
+
 def meld_adres():
     """Vertelt de web-app op welk adres het dashboard de brug kan bereiken."""
     while True:
@@ -521,6 +552,12 @@ def verwerk(p, afzender="onbekend"):
             # volgende keer opvragen.
             ZUIGER.opdracht(str(p["opdracht"]))
         return {"ok": True, "brug": True, "stofzuiger": ZUIGER_STAND}
+    if actie == "intercom":
+        if INTERCOM is None:
+            return {"ok": True, "brug": True, "intercom": {"ok": False, "fout": INTERCOM_FOUT}}
+        if p.get("opdracht") == "open":
+            INTERCOM.open()      # weigert buiten de minuten na het aanbellen
+        return {"ok": True, "brug": True, "intercom": INTERCOM.stand()}
     if actie in ("scene", "scenes", "agenda"):
         q = {"action": actie}
         if p.get("name"):
@@ -610,6 +647,7 @@ def main():
     threading.Thread(target=meld_adres, daemon=True).start()
     threading.Thread(target=thermostaat_lus, daemon=True).start()
     threading.Thread(target=stofzuiger_lus, daemon=True).start()
+    threading.Thread(target=intercom_lus, daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", poort), Verzoek)
     log(f"brug luistert op 127.0.0.1:{poort}")
     server.serve_forever()
