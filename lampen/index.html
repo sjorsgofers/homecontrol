@@ -85,7 +85,7 @@ html,body{margin:0;height:100%;overflow:hidden;color:var(--txt);
 body{background:var(--bg);background:var(--bg-grad)}
 button{font-family:inherit;color:inherit;margin:0}
 
-#app{display:flex;align-items:stretch;height:100vh;padding:calc(var(--s)*28)}
+#app{display:flex;align-items:stretch;height:100%;padding:calc(var(--s)*28)}
 /* Schermvullende webapp: ruimte laten voor statusbalk en afgeronde hoeken */
 @supports (padding:max(0px)){
   #app{padding-top:max(calc(var(--s)*28),env(safe-area-inset-top));padding-bottom:max(calc(var(--s)*28),env(safe-area-inset-bottom));
@@ -285,14 +285,16 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
 @keyframes draai{to{transform:rotate(360deg)}}
 #demo{position:fixed;right:12px;bottom:8px;font-size:11px;color:var(--faint);letter-spacing:.04em}
 
-/* ---------- Staand scherm (telefoon): alles onder elkaar ---------- */
-html.staand,html.staand body{height:auto;min-height:100%;overflow-y:auto}
-.staand #app{flex-direction:column;height:auto;min-height:100vh}
-.staand #links{flex:0 0 auto;padding:calc(var(--s)*10) 0 calc(var(--s)*26) calc(var(--s)*6)}
-.staand .uit-tegel{flex-direction:row;width:100%;height:calc(var(--s)*96);margin-top:calc(var(--s)*28)}
-.staand .uit-tegel .rond{margin:0 calc(var(--s)*20) 0 0;width:calc(var(--s)*58);height:calc(var(--s)*58)}
-.staand .onder{margin-top:0;flex-direction:row;flex-wrap:wrap}
+/* ---------- Staand scherm: klok boven, plattegrond onder; alles blijft in beeld ---------- */
+.staand #app{flex-direction:column;justify-content:space-between}
+.staand #links{flex:0 0 auto;padding:calc(var(--s)*8) calc(var(--s)*6) calc(var(--s)*18)}
+.staand .klok{font-size:calc(var(--s)*112)}
+.staand .uit-tegel{flex-direction:row;width:100%;height:calc(var(--s)*88);margin-top:calc(var(--s)*24)}
+.staand .uit-tegel .rond{margin:0 calc(var(--s)*20) 0 0;width:calc(var(--s)*56);height:calc(var(--s)*56)}
+.staand .onder{margin-top:0;flex-direction:row;flex-wrap:wrap;align-items:flex-end}
+.staand #overig{display:flex;flex-wrap:wrap}
 .staand .chip{margin-right:calc(var(--s)*14)}
+.staand #party{margin-right:0}
 </style>
 </head>
 <body>
@@ -392,20 +394,73 @@ html.staand,html.staand body{height:auto;min-height:100%;overflow-y:auto}
   $('uitIcoon').innerHTML = ICOON.lampUit;
 
   /* ---------- Maatvoering ---------- */
+  /* De twee eenheden worden zo gekozen dat alles altijd op het scherm past, liggend en
+     staand: eerst een schatting, daarna meten en verkleinen tot niets meer buiten beeld
+     valt of over de plattegrond heen ligt. */
+  function zetMaat(s, u){
+    var st = document.documentElement.style;
+    st.setProperty('--s', s.toFixed(4) + 'px');
+    st.setProperty('--u', u.toFixed(4) + 'px');
+  }
+  /* Kleinste x van de buitenmuur tussen twee hoogtes (in eenheden van de plattegrond). */
+  function muurLinks(y0, y1){
+    var m = PLATTEGROND.muur, min = Infinity;
+    for (var i = 0; i < m.length; i++) {
+      var a = m[i], b = m[(i + 1) % m.length];
+      if (Math.max(a[1], b[1]) <= y0 || Math.min(a[1], b[1]) >= y1) continue;
+      min = Math.min(min, a[0], b[0]);
+    }
+    return min;
+  }
+  /* Hoeveel de linkerkolom (links) en het geheel te groot zijn; 1 = past precies. */
+  function overloop(staand, s){
+    var W = innerWidth, rand = 28 * s;
+    var app = $('app'), links = $('links');
+    var p = $('plan').getBoundingClientRect(), l = links.getBoundingClientRect();
+    var uPx = p.width / PLATTEGROND.breedte;
+    var uit = { links: 1, geheel: 1 };
+    if (staand) uit.geheel = app.scrollHeight / app.clientHeight;
+    else uit.links = links.scrollHeight / links.clientHeight;
+    [$('klok'), $('datum').parentNode, $('allesUit'), $('overig'), $('weer').parentNode].forEach(function(el){
+      var r = el.getBoundingClientRect();
+      if (!r.width) return;
+      var grens = W - rand;
+      if (!staand) {
+        var x = muurLinks((r.top - p.top) / uPx - 6, (r.bottom - p.top) / uPx + 6);
+        if (x !== Infinity) grens = p.left + x * uPx - 12 * s;
+      }
+      uit.links = Math.max(uit.links, (r.right - l.left) / Math.max(1, grens - l.left));
+    });
+    return uit;
+  }
   function maat(){
-    var W = innerWidth, H = innerHeight, P = PLATTEGROND, s, u, rand;
+    var W = innerWidth, H = innerHeight, P = PLATTEGROND, s, u;
     var staand = W < H;
     document.documentElement.classList.toggle('staand', staand);
     if (staand) {
-      s = W / 620; rand = 28 * s;
-      u = (W - 2 * rand) / P.breedte;
+      s = W / 620;
+      u = (W - 56 * s) / P.breedte;
     } else {
-      s = Math.min(W / 1024, H / 700); rand = 28 * s;
-      u = Math.min((H - 2 * rand) / P.hoogte, (W * 0.66 - rand) / P.breedte);
+      s = Math.min(W / 1024, H / 700);
+      u = Math.min((H - 56 * s) / P.hoogte, (W * 0.66 - 28 * s) / P.breedte);
     }
-    document.documentElement.style.setProperty('--s', s.toFixed(4) + 'px');
-    document.documentElement.style.setProperty('--u', u.toFixed(4) + 'px');
+    var s0 = s;
+    for (var i = 0; i < 40; i++) {
+      zetMaat(s, u);
+      var o = overloop(staand, s);
+      if (o.links <= 1.002 && o.geheel <= 1.002) break;
+      if (o.geheel > 1.002) {
+        // Staand te hoog: eerst de kop kleiner, daarna kop en plattegrond samen
+        var f = Math.max(0.9, 1 / o.geheel);
+        s *= f;
+        if (s < s0 * 0.72) u *= f;
+      } else {
+        s *= Math.max(0.9, 1 / o.links);
+      }
+    }
   }
+  var pasTimer = null;
+  function pasAan(){ clearTimeout(pasTimer); pasTimer = setTimeout(maat, 30); }
 
   /* ---------- Klok en datum ---------- */
   var DAGEN = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'];
@@ -453,6 +508,7 @@ html.staand,html.staand body{height:auto;min-height:100%;overflow-y:auto}
     $('weerTemp').textContent = Math.round(graden) + '°C';
     $('weerOms').textContent = b.tekst;
     $('weer').hidden = false;
+    pasAan();
   }
   function weer(){
     var proef = par('weertest');
@@ -717,6 +773,7 @@ html.staand,html.staand body{height:auto;min-height:100%;overflow-y:auto}
         });
         el.appendChild(b);
       });
+      pasAan();
     }
     lijst.forEach(function(r, i){
       var b = el.children[i];
@@ -866,6 +923,7 @@ html.staand,html.staand body{height:auto;min-height:100%;overflow-y:auto}
   maat();
   bouwPlan();
   addEventListener('resize', maat);
+  addEventListener('orientationchange', pasAan);
   haalStand();
   if (!DEMO) setInterval(haalStand, POLL);
   weer(); setInterval(weer, 15 * 60 * 1000);
