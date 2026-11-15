@@ -339,8 +339,10 @@ input[type=range].warm::-moz-range-progress{background:transparent}
 /* Onderaan op een rij: 'Alle lampen uit', de stofzuiger en de partyknop */
 .rij{display:flex;align-items:center;margin-top:calc(var(--s)*16)}
 .rij > * + *{margin-left:calc(var(--s)*12)}
+/* De partyknop staat los van de rij: klein in de hoek rechtsboven */
 #party{appearance:none;-webkit-appearance:none;justify-content:center;width:calc(var(--s)*54);height:calc(var(--s)*54);
-  margin-top:0;padding:0;cursor:pointer;transition:background .4s}
+  position:fixed;z-index:6;top:calc(env(safe-area-inset-top, 0px) + var(--s)*10);right:calc(env(safe-area-inset-right, 0px) + var(--s)*10);
+  margin:0;padding:0;cursor:pointer;transition:background .4s}
 #party svg{margin:0;width:calc(var(--s)*26);height:calc(var(--s)*26);stroke:var(--party-uit);stroke-width:1.7;transition:stroke .4s}
 #party.aan{background:var(--party-aan-bg)}
 #party.aan svg{stroke:var(--party-aan);animation:draai 7s linear infinite}
