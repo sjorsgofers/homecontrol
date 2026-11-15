@@ -363,7 +363,7 @@ def verwerk(p):
         helder = p.get("bright")
         helder = None if helder in (None, "") else float(helder)
         return {"ok": True, "resultaat": schakel(ids, aan, helder), "brug": True}
-    if actie in ("scene", "scenes"):
+    if actie in ("scene", "scenes", "agenda"):
         q = {"action": actie}
         if p.get("name"):
             q["name"] = p["name"]

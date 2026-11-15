@@ -60,6 +60,7 @@ function verwerk_(p) {
       CacheService.getScriptCache().remove('status');
       return { ok: true, resultaat: res };
     }
+    if (p.action === 'agenda') return { ok: true, afspraken: agenda_() };
     if (p.action === 'lokaal') return { ok: true, apparaten: lokaal_() };
     if (p.action === 'brug') {
       PropertiesService.getScriptProperties().setProperty('BRUG', String(p.url || ''));
@@ -316,6 +317,33 @@ function startScene_(naam) {
   tuya_('POST', '/v1.0/homes/' + s.home + '/scenes/' + s.id + '/trigger');
   CacheService.getScriptCache().remove('status');
   return s.name;
+}
+
+/* ----------------------------- agenda ----------------------------- */
+
+/* Afspraken van vandaag en morgen uit Google Agenda; 5 minuten gecachet.
+   Scripteigenschap AGENDA = agenda-ID (meestal een e-mailadres); leeg = de eigen agenda.
+   Een agenda van een ander account moet gedeeld zijn met het account van dit script.
+   Het script heeft hiervoor alleen leesrechten nodig (zie oauthScopes in appsscript.json). */
+function agenda_() {
+  var cache = CacheService.getScriptCache();
+  var c = cache.get('agenda');
+  if (c) return JSON.parse(c);
+  var id = prop_('AGENDA');
+  var cal = id ? CalendarApp.getCalendarById(id) : CalendarApp.getDefaultCalendar();
+  if (!cal) throw new Error('Agenda "' + id + '" is niet gevonden of niet gedeeld met dit account');
+  var nu = new Date();
+  var tot = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate() + 2);
+  var uit = cal.getEvents(nu, tot).slice(0, 12).map(function (e) {
+    return {
+      titel: e.getTitle(),
+      start: e.getStartTime().toISOString(),
+      eind: e.getEndTime().toISOString(),
+      heleDag: e.isAllDayEvent()
+    };
+  });
+  cache.put('agenda', JSON.stringify(uit), 300);
+  return uit;
 }
 
 /* ------------------- brug op het thuisnetwerk ------------------- */
