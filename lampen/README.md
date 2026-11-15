@@ -128,6 +128,30 @@ https://sjorsgofers.github.io/homecontrol/lampen/
   `…/lampen/#id=<IMPLEMENTATIE-ID>&key=<SLEUTEL>&lat=<..>&lon=<..>`. Wat achter `#`
   staat wordt niet naar de webserver gestuurd.
 
+## Sneller met een brug thuis (optioneel)
+
+Via de web-app kost elke tik ruim een seconde. Staat er thuis een apparaat altijd aan,
+dan kan `brug.py` de lampen rechtstreeks over het thuisnetwerk aansturen; dat gaat in
+enkele honderdsten van een seconde. Is de brug niet bereikbaar (apparaat uit, of je
+bent niet in je eigen netwerk), dan gebruikt het dashboard vanzelf weer de web-app.
+
+```bash
+pip install tinytuya
+python brug.py --config <map>/lampen-config.json
+```
+
+- `lampen-config.json` (buiten de repo) bevat `api` (de /exec-URL), `key` (de SLEUTEL) en
+  `brug_url`: het https-adres waarop het dashboard de brug bereikt.
+- De brug luistert alleen op `127.0.0.1:8322`. Het dashboard is een https-pagina en mag
+  alleen met een https-adres praten; met Tailscale kan dat zonder iets open te zetten naar
+  internet: `tailscale serve --bg --https=8443 http://127.0.0.1:8322`. Het adres is dan
+  `https://<naam>.<tailnet>.ts.net:8443/` en werkt op elk apparaat in je Tailscale-netwerk.
+- De brug meldt zijn adres aan de web-app; het dashboard krijgt het daar vandaan en
+  onthoudt het. Er hoeft niets in de pagina of de repo te staan.
+- Sleutels en nummers per lamp haalt de brug op bij de web-app, adressen zoekt hij op het
+  netwerk. Lampen die hij niet rechtstreeks vindt, lopen via de web-app. Scènes ook.
+- Uitvoer staat in `brug.log` naast de config.
+
 ## Bedienen
 
 - **Tik op een kamer**: alles in die kamer aan/uit.
@@ -180,3 +204,4 @@ zet die naam dan in `ook`, bijvoorbeeld `ook:['Huiskamer']`.
 - `manifest.webmanifest`, `icoon-*.png` — maken van de pagina een webapp voor het beginscherm
 - `apps-script.gs` — Apps Script dat de Tuya Cloud API aanroept
 - `lampen.py` — serveert de pagina en houdt hem op de Nest Hub
+- `brug.py` — optionele brug thuis die de lampen rechtstreeks aanstuurt (snel)

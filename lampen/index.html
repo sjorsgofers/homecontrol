@@ -577,6 +577,40 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     addEventListener('pointerdown', eens, true); addEventListener('touchstart', eens, true);
   })();
 
+  /* Eén aanroep naar de bediening. Is er thuis een brug (brug.py) en is die bereikbaar,
+     dan gaat het daarlangs: rechtstreeks over het thuisnetwerk, dus snel. Anders via de
+     web-app. Het adres van de brug komt van de web-app en wordt op dit apparaat onthouden. */
+  var BRUG = bewaar('brug', '');
+  var brugUitTot = 0, viaBrug = false, laatsteStand = 0;
+  function vraag(opdracht){
+    var tekst = JSON.stringify(Object.assign({ key: KEY }, opdracht));
+    function viaWebapp(){
+      viaBrug = false;
+      return fetch(API, { method:'POST', body: tekst }).then(function(r){ return r.json(); }).then(function(j){
+        if (j && typeof j.brug === 'string' && j.brug !== BRUG) {
+          BRUG = j.brug; brugUitTot = 0;
+          try { if (BRUG) localStorage.setItem('lampen_brug', BRUG); else localStorage.removeItem('lampen_brug'); } catch (e) {}
+        }
+        return j;
+      });
+    }
+    if (!BRUG || Date.now() < brugUitTot) return viaWebapp();
+    var stop = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function(){ if (stop) stop.abort(); }, 3000);
+    return fetch(BRUG, { method:'POST', body: tekst, signal: stop ? stop.signal : undefined })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        // Kent de brug deze sleutel niet (bijvoorbeeld na het wijzigen ervan), dan beslist de web-app
+        if (!j || (j.ok === false && j.fout === 'Onjuiste sleutel')) throw new Error('brug weigert');
+        clearTimeout(timer); viaBrug = true; return j;
+      })
+      .catch(function(){
+        // Brug niet bereikbaar (pc uit, of dit apparaat zit niet in het thuisnetwerk): een minuut via de web-app
+        clearTimeout(timer); brugUitTot = Date.now() + 60000;
+        return viaWebapp();
+      });
+  }
+
   function stip(s, tekst){ $('stip').className = 'stip' + (s ? ' '+s : ''); $('stip').title = tekst || ''; }
 
   function melding(t){
@@ -587,14 +621,14 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
   function haalStand(vers){
     if (DEMO) { if (!ruimtes.length) ruimtes = demoData(); teken(); meld('geladen: demo, ' + innerWidth + 'x' + innerHeight); return Promise.resolve(); }
     stip('bezig');
-    var url = API + (API.indexOf('?') >= 0 ? '&' : '?') + 'action=' + (vers ? 'refresh' : 'state') + '&key=' + encodeURIComponent(KEY) + '&_=' + Date.now();
-    return fetch(url, { cache:'no-store' }).then(function(r){ return r.json(); }).then(function(j){
+    return vraag({ action: vers ? 'refresh' : 'state' }).then(function(j){
       if (!j.ok) throw new Error(j.fout || 'Onbekende fout');
+      laatsteStand = Date.now();
       // Lopende opdrachten niet overschrijven met oudere stand
       var oud = {}; ruimtes.forEach(function(r){ oud[r.id] = r; });
       ruimtes = j.ruimtes.filter(function(r){ return TOON_OVERIG || opPlattegrond(r); })
         .map(function(r){ return bezig[r.id] && oud[r.id] ? oud[r.id] : r; });
-      stip('', 'Bijgewerkt ' + new Date().toLocaleTimeString('nl-NL'));
+      stip('', 'Bijgewerkt ' + new Date().toLocaleTimeString('nl-NL') + (viaBrug ? ' via de brug thuis' : ' via de web-app'));
       teken();
       meld('geladen: gekoppeld, ' + ruimtes.length + ' ruimtes, ' + innerWidth + 'x' + innerHeight);
     }).catch(function(e){
@@ -607,10 +641,10 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
 
   function stuur(ruimteId, ids, aan, helder){
     if (DEMO) return new Promise(function(ok){ setTimeout(ok, 350); });
-    var body = { key: KEY, action: 'set', ids: ids };
+    var body = { action: 'set', ids: ids };
     if (aan !== null) body.on = aan;
     if (helder !== null) body.bright = helder;
-    return fetch(API, { method:'POST', body: JSON.stringify(body) }).then(function(r){ return r.json(); }).then(function(j){
+    return vraag(body).then(function(j){
       if (!j.ok) throw new Error(j.fout || 'Onbekende fout');
       var mis = (j.resultaat || []).filter(function(x){ return !x.ok; });
       if (mis.length) melding(mis.length + ' lamp' + (mis.length > 1 ? 'en reageerden' : ' reageerde') + ' niet');
@@ -927,8 +961,7 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     function onthoud(){ try { localStorage.setItem('lampen_party', aan ? '1' : '0'); } catch (e) {} }
     function start(naam){
       if (DEMO) return new Promise(function(ok){ setTimeout(ok, 350); });
-      return fetch(API, { method:'POST', body: JSON.stringify({ key: KEY, action: 'scene', name: naam }) })
-        .then(function(r){ return r.json(); })
+      return vraag({ action: 'scene', name: naam })
         .then(function(j){ if (!j.ok) throw new Error(j.fout || 'Onbekende fout'); });
     }
     knop.addEventListener('click', function(){
@@ -1023,7 +1056,10 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
   addEventListener('orientationchange', pasAan);
   // Nog geen sleutel op dit apparaat: eerst koppelen (of het voorbeeld bekijken)
   if (!DEMO && !KEY) toonKoppelen(); else haalStand();
-  setInterval(function(){ if (!DEMO && KEY) haalStand(); }, POLL);
+  // Via de brug thuis is de stand ophalen goedkoop: dan elke 10 s, anders volgens POLL
+  setInterval(function(){
+    if (!DEMO && KEY && (viaBrug || Date.now() - laatsteStand > POLL - 1000)) haalStand();
+  }, 10000);
   weer(); setInterval(weer, 15 * 60 * 1000);
   // Tablet of telefoon die weer wakker wordt: meteen de actuele stand en tijd tonen
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) { klok(); if (!DEMO) haalStand(); } });

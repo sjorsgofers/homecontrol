@@ -60,12 +60,18 @@ function verwerk_(p) {
       CacheService.getScriptCache().remove('status');
       return { ok: true, resultaat: res };
     }
+    if (p.action === 'lokaal') return { ok: true, apparaten: lokaal_() };
+    if (p.action === 'brug') {
+      PropertiesService.getScriptProperties().setProperty('BRUG', String(p.url || ''));
+      PROPS_ = null;
+      return { ok: true, brug: String(p.url || '') };
+    }
     if (p.action === 'scene') return { ok: true, scene: startScene_(p.name) };
     if (p.action === 'scenes') return { ok: true, scenes: scenes_().map(function (s) { return s.name; }) };
     if (p.action === 'refresh') {
       CacheService.getScriptCache().removeAll(['apparaten', 'status', 'scenes', 'huizen', 'codes']);
     }
-    return { ok: true, ruimtes: stand_() };
+    return { ok: true, ruimtes: stand_(), brug: prop_('BRUG') };
   } catch (err) {
     return { ok: false, fout: String(err && err.message || err) };
   }
@@ -310,6 +316,28 @@ function startScene_(naam) {
   tuya_('POST', '/v1.0/homes/' + s.home + '/scenes/' + s.id + '/trigger');
   CacheService.getScriptCache().remove('status');
   return s.name;
+}
+
+/* ------------------- brug op het thuisnetwerk ------------------- */
+
+/* Voor brug.py: per lamp de lokale sleutel en bij elke code het lokale nummer (dp),
+   zodat de brug de lampen rechtstreeks over het thuisnetwerk kan aansturen. */
+function lokaal_() {
+  var ids = {};
+  apparaten_().lampen.forEach(function (l) { ids[l.id] = true; });
+  var lijst = alleApparaten_().filter(function (d) { return ids[d.id]; });
+  var verzoeken = lijst.map(function (d) {
+    return verzoek_('GET', '/v2.0/cloud/thing/' + d.id + '/shadow/properties');
+  });
+  var antwoorden = verzoeken.length ? UrlFetchApp.fetchAll(verzoeken) : [];
+  return lijst.map(function (d, i) {
+    var dps = {};
+    try {
+      var j = JSON.parse(antwoorden[i].getContentText());
+      ((j.result && j.result.properties) || []).forEach(function (p) { dps[p.code] = p.dp_id; });
+    } catch (e) {}
+    return { id: d.id, name: d.name, key: d.local_key, dps: dps };
+  });
 }
 
 /* --------------------------- helderheid --------------------------- */
