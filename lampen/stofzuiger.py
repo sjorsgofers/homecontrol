@@ -191,6 +191,16 @@ class Stofzuiger:
                                                                        str(d.get("deviceName")).lower())), apparaten[0])
             self.info = next(a for a in self.apparaten if a["id"] == gekozen.get("deviceId"))
             self.apparaat = await eufy.init_device(gekozen["deviceId"])
+            # De opgehaalde code kort het modelnummer in tot 5 tekens (T2292), maar sommige
+            # stofzuigers (zoals de C10, T2292B) luisteren alleen op het adres met het volledige
+            # nummer: opdrachten verdwijnen dan zonder foutmelding. Neem daarom het nummer
+            # zoals Eufy's berichtendienst het zelf opgeeft.
+            try:
+                vol = (await eufy.eufyCleanApi.getMqttDevice(gekozen["deviceId"]) or {}).get("device_model")
+                if vol:
+                    self.apparaat.deviceModel = vol
+            except Exception:
+                pass
             await self.apparaat.connect()
 
         try:
