@@ -384,7 +384,7 @@ def stofzuiger_lus():
             ZUIGER_STAND = ZUIGER.stand()
         except Exception as e:
             log(f"stofzuiger lezen: {e}")
-        time.sleep(20)
+        time.sleep(5)
 
 
 def meld_adres():
@@ -488,9 +488,7 @@ def verwerk(p):
         if THERMO is None:
             return {"ok": True, "brug": True, "thermostaat": {"ok": False, "fout": "niet gekoppeld"}}
         if p.get("stand") in ("klok", "handmatig"):
-            THERMO.zet_stand(p["stand"])
-            time.sleep(2)          # de thermostaat even de tijd geven en dan de echte stand lezen
-            THERMO.lees()
+            THERMO.zet_stand(p["stand"])   # meteen antwoorden; de echte stand volgt bij het volgende lezen
         if p.get("graden") not in (None, ""):
             THERMO.zet(float(p["graden"]))
         return {"ok": True, "brug": True, "thermostaat": THERMO.stand or THERMO.lees()}
@@ -499,9 +497,9 @@ def verwerk(p):
         if ZUIGER is None:
             return {"ok": True, "brug": True, "stofzuiger": ZUIGER_STAND}
         if p.get("opdracht"):
+            # Meteen antwoorden (het dashboard wacht maar kort); de nieuwe stand volgt bij de
+            # volgende keer opvragen.
             ZUIGER.opdracht(str(p["opdracht"]))
-            time.sleep(3)          # even wachten tot de stofzuiger zijn nieuwe stand meldt
-            ZUIGER_STAND = ZUIGER.stand()
         return {"ok": True, "brug": True, "stofzuiger": ZUIGER_STAND}
     if actie in ("scene", "scenes", "agenda"):
         q = {"action": actie}

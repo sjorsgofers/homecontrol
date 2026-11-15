@@ -257,11 +257,11 @@ input[type=range].warm::-moz-range-progress{background:transparent}
 .th-knop:active{transform:scale(.92)}
 /* Tik op de temperatuur: menu met klokprogramma / handmatig */
 .th-nu{cursor:pointer}
-#zuiger{appearance:none;-webkit-appearance:none;justify-content:center;width:calc(var(--s)*54);height:calc(var(--s)*54);
+#zuiger{appearance:none;-webkit-appearance:none;justify-content:center;width:calc(var(--s)*76);height:calc(var(--s)*54);
   margin-top:0;padding:0;cursor:pointer;transition:background .4s}
-#zuiger svg{margin:0;width:calc(var(--s)*27);height:calc(var(--s)*27);stroke:var(--party-uit);stroke-width:1.7}
+#zuiger svg{margin:0;width:calc(var(--s)*38);height:calc(var(--s)*38);stroke:var(--ink-zacht);stroke-width:1.5}
 #zuiger.bezig{background:var(--chip-aan)}
-#zuiger.bezig svg{stroke:var(--accent-tekst);animation:draai 5s linear infinite}
+#zuiger.bezig svg{stroke:var(--accent-tekst);animation:puls 1.4s ease-in-out infinite}
 #thMenu,#zuMenu{position:fixed;left:0;top:0;right:0;bottom:0;z-index:35;display:flex;align-items:center;justify-content:center;
   padding:20px;background:var(--paneel-achter)}
 .th-kaart{width:380px}
@@ -495,7 +495,8 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     zon: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>'),
     wolk: svg('<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>'),
     regen: svg('<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/><path d="M16 14v6M8 14v6M12 16v6"/>'),
-    zuiger: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M5.5 17.5l2-2M18.5 17.5l-2-2"/>'),
+    zuiger: svg('<path d="M2.5 17.5v-2.5a4 4 0 0 1 4-4h3.5a4 4 0 0 1 4 4v2.5z"/><circle cx="6" cy="19.3" r="1.7"/><path d="M5.5 13.2h5"/>' +
+      '<path d="M14 14c2.2 0 3.6-1.4 3.6-3.6V5.2"/><path d="M16.2 5.2h3.4"/><path d="M19.6 5.2v12"/><path d="M17 20.5h5.5l-.9-3.3h-3.7z"/>'),
     disco: svg('<path d="M12 2v5"/><circle cx="12" cy="14" r="7"/><path d="M5.4 12h13.2M5.4 16h13.2"/><path d="M12 7c-2.6 2-2.6 12 0 14M12 7c2.6 2 2.6 12 0 14"/>'),
     sneeuw: svg('<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/><path d="M8 15h.01M8 19h.01M12 17h.01M12 21h.01M16 15h.01M16 19h.01"/>')
   };
@@ -1202,7 +1203,7 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     t.stand = naar; tekenThermo();
     if (t.voorbeeld) return;
     vraag({ action: 'thermostaat', stand: naar }).then(function(j){
-      if (j && j.thermostaat && j.thermostaat.ok) { thermo = j.thermostaat; tekenThermo(); }
+      if (j && j.thermostaat && j.thermostaat.ok) { setTimeout(haalThermo, 4000); }
       else melding('Thermostaat omzetten is niet gelukt');
     }).catch(function(){ melding('Thermostaat omzetten is niet gelukt'); });
   }
@@ -1235,8 +1236,10 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     o.addEventListener('click', function(){
       $('zuMenu').hidden = true;
       vraag({ action: 'stofzuiger', opdracht: o.dataset.opdracht }).then(function(j){
-        if (j && j.stofzuiger && j.stofzuiger.ok) { zuiger = j.stofzuiger; tekenZuiger(); }
-        else melding('De stofzuiger reageert niet');
+        if (j && j.stofzuiger && j.stofzuiger.ok) {
+          zuiger = j.stofzuiger; tekenZuiger();
+          setTimeout(haalZuiger, 4000); setTimeout(haalZuiger, 10000);
+        } else melding('De stofzuiger reageert niet');
       }).catch(function(){ melding('De stofzuiger reageert niet'); });
     });
   });
