@@ -399,8 +399,8 @@ def intercom_lus():
     except Exception as e:
         log(f"intercom niet beschikbaar: {e}")
         return
-    if not intercom.gekoppeld(MAP):
-        return
+    while not intercom.gekoppeld(MAP):   # wachten tot er is ingelogd (intercom.py --inloggen)
+        time.sleep(30)
     while INTERCOM is None:
         try:
             i = intercom.Intercom(CFG, MAP, log)
