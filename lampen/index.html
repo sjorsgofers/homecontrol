@@ -379,6 +379,10 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
      in de app (hoofdletters maken niet uit). */
   var SCENES = { party: 'Party', standaard: 'Standaard' };
 
+  /* Ruimtes uit de app die niet op de plattegrond staan: tonen als knopje linksonder (true)
+     of helemaal weglaten (false). Weggelaten ruimtes doen ook niet mee met 'Alle lampen uit'. */
+  var TOON_OVERIG = false;
+
   /* ---------- Plattegrond ----------
      Eenheden op een vlak van 660 x 652. 'muur' is de buitenomtrek van de woning.
      Per kamer: plek en maat, en binnen de kamer de plek van naam, lampknop en status.
@@ -588,7 +592,8 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
       if (!j.ok) throw new Error(j.fout || 'Onbekende fout');
       // Lopende opdrachten niet overschrijven met oudere stand
       var oud = {}; ruimtes.forEach(function(r){ oud[r.id] = r; });
-      ruimtes = j.ruimtes.map(function(r){ return bezig[r.id] && oud[r.id] ? oud[r.id] : r; });
+      ruimtes = j.ruimtes.filter(function(r){ return TOON_OVERIG || opPlattegrond(r); })
+        .map(function(r){ return bezig[r.id] && oud[r.id] ? oud[r.id] : r; });
       stip('', 'Bijgewerkt ' + new Date().toLocaleTimeString('nl-NL'));
       teken();
       meld('geladen: gekoppeld, ' + ruimtes.length + ' ruimtes, ' + innerWidth + 'x' + innerHeight);
@@ -657,6 +662,11 @@ html.donker #thema::after{transform:translateX(calc(var(--s)*22))}
     return null;
   }
   var paneelSinds = 0;
+  function opPlattegrond(r){
+    return PLATTEGROND.kamers.some(function(k){
+      return [k.naam].concat(k.ook || []).map(norm).indexOf(norm(r.name)) >= 0;
+    });
+  }
   function openPaneel(id){ open = id; paneelSinds = Date.now(); tekenPaneel(); $('paneel').classList.add('open'); }
 
   /* Gebaren op een element:

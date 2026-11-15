@@ -137,8 +137,9 @@ https://sjorsgofers.github.io/homecontrol/lampen/
 - **Alle lampen uit**: de tegel links.
 - **Klok lang indrukken**: lampen/ruimtes opnieuw ophalen (na een nieuwe lamp).
 - **Schakelaartje onder de partyknop**: licht of donker thema; de keuze wordt per apparaat onthouden.
-- Ruimtes uit de app die niet op de plattegrond staan, verschijnen als knopje linksonder
-  (zelfde bediening: tik = aan/uit, lang indrukken = paneel).
+- Ruimtes uit de app die niet op de plattegrond staan, doen niet mee. Zet `TOON_OVERIG`
+  in `index.html` op `true` om ze als knopje linksonder te tonen (tik = aan/uit, lang
+  indrukken = paneel).
 
 ## Scènes (partyknop)
 
