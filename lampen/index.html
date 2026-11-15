@@ -76,16 +76,14 @@ button{font-family:inherit;color:inherit;margin:0}
 .stip.fout{background:var(--rood)}
 
 .kop{display:flex;align-items:center}
-.uit-knop{appearance:none;-webkit-appearance:none;border:0;cursor:pointer;display:flex;align-items:center;
-  height:calc(var(--s)*54);padding:0 calc(var(--s)*20) 0 calc(var(--s)*9);white-space:nowrap;
+/* 'Alle lampen uit': alleen een doorgestreept lampje, even groot als de stofzuigerknop */
+.uit-knop{appearance:none;-webkit-appearance:none;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  width:calc(var(--s)*76);height:calc(var(--s)*54);padding:0;
   border-radius:calc(var(--s)*15);background:var(--vlak);box-shadow:var(--schaduw);
-  font-size:calc(var(--s)*19);transition:transform .15s var(--ease)}
+  transition:transform .15s var(--ease)}
 .uit-knop:active{transform:scale(.97)}
-.uit-knop .rond{display:flex;align-items:center;justify-content:center;
-  width:calc(var(--s)*36);height:calc(var(--s)*36);margin-right:calc(var(--s)*11);border-radius:50%;background:var(--diep);
-  box-shadow:inset calc(var(--s)*2) calc(var(--s)*2) calc(var(--s)*5) var(--inzet-d),
-             inset calc(var(--s)*-1) calc(var(--s)*-1) calc(var(--s)*4) var(--inzet-l)}
-.uit-knop svg{width:calc(var(--s)*19);height:calc(var(--s)*19);stroke:var(--ink-zacht)}
+.uit-knop span{display:flex}
+.uit-knop svg{width:calc(var(--s)*34);height:calc(var(--s)*34);stroke:var(--ink-zacht);stroke-width:1.5}
 
 /* Agenda: vult de ruimte tussen de datum en de knoppen; wat niet past blijft weg */
 #agenda{flex:1 1 0;min-height:0;overflow:hidden;width:calc(var(--s)*310);margin-top:calc(var(--s)*20)}
@@ -337,8 +335,9 @@ input[type=range].warm::-moz-range-progress{background:transparent}
 .staand .chip{margin-right:calc(var(--s)*14)}
 .staand #party{margin-right:0}
 /* Op de telefoon is de stofzuigerknop anders lastig te raken */
-.staand #zuiger{width:calc(var(--s)*118);height:calc(var(--s)*76)}
+.staand #zuiger,.staand .uit-knop{width:calc(var(--s)*118);height:calc(var(--s)*76)}
 .staand #zuiger svg{width:calc(var(--s)*56);height:calc(var(--s)*56)}
+.staand .uit-knop svg{width:calc(var(--s)*50);height:calc(var(--s)*50)}
 </style>
 </head>
 <body>
@@ -361,7 +360,7 @@ input[type=range].warm::-moz-range-progress{background:transparent}
     <div class="onder">
       <div id="overig"></div>
       <div class="rij">
-        <button class="uit-knop" id="allesUit"><span class="rond" id="uitIcoon"></span><span>Alle lampen uit</span></button>
+        <button class="uit-knop" id="allesUit" aria-label="Alle lampen uit" title="Alle lampen uit"><span id="uitIcoon"></span></button>
         <button class="chip" id="zuiger" aria-label="Stofzuiger" hidden></button>
         <button class="chip" id="party" aria-label="Partymodus"></button>
       </div>
