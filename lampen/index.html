@@ -296,6 +296,15 @@ input[type=range].warm::-moz-range-progress{background:transparent}
   background:transparent;border:1px solid var(--lijn);color:var(--muted)}
 @keyframes belt{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(5deg)}}
 
+/* ---------- Omlaag vegen om te verversen ---------- */
+#ververs{position:fixed;left:50%;top:calc(env(safe-area-inset-top, 0px) - 56px);z-index:50;width:44px;height:44px;margin-left:-22px;
+  display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--vel);box-shadow:var(--schaduw);
+  color:var(--ink-zacht);opacity:0;pointer-events:none;transform:translateY(0)}
+#ververs.terug{transition:transform .25s var(--ease),opacity .25s var(--ease)}
+#ververs svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#ververs.los{color:var(--accent-tekst)}
+#ververs.bezig svg{animation:draai .8s linear infinite}
+
 /* ---------- Meldingen ---------- */
 #melding{position:fixed;left:50%;bottom:18px;z-index:30;max-width:90vw;padding:12px 20px;border-radius:14px;
   transform:translate(-50%,20px);opacity:0;pointer-events:none;text-align:center;font-size:16px;
@@ -343,6 +352,9 @@ input[type=range].warm::-moz-range-progress{background:transparent}
 #party{appearance:none;-webkit-appearance:none;justify-content:center;width:calc(var(--s)*54);height:calc(var(--s)*54);
   position:fixed;z-index:6;top:calc(env(safe-area-inset-top, 0px) + var(--s)*10);right:calc(env(safe-area-inset-right, 0px) + var(--s)*10);
   margin:0;padding:0;cursor:pointer;transition:background .4s}
+html:not(.staand) #party{width:calc(var(--s)*32);height:calc(var(--s)*32);border-radius:calc(var(--s)*10);
+  top:calc(env(safe-area-inset-top, 0px) + var(--s)*4);right:calc(env(safe-area-inset-right, 0px) + var(--s)*5)}
+html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
 #party svg{margin:0;width:calc(var(--s)*26);height:calc(var(--s)*26);stroke:var(--party-uit);stroke-width:1.7;transition:stroke .4s}
 #party.aan{background:var(--party-aan-bg)}
 #party.aan svg{stroke:var(--party-aan);animation:draai 7s linear infinite}
@@ -446,6 +458,7 @@ input[type=range].warm::-moz-range-progress{background:transparent}
     <button id="belWeg">Niet opendoen</button>
   </div>
 </div>
+<div id="ververs"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></div>
 <div id="melding"></div>
 <button id="demo" hidden>Voorbeeld · tik om te koppelen</button>
 
@@ -1320,6 +1333,64 @@ input[type=range].warm::-moz-range-progress{background:transparent}
       }
     }).catch(function(){ knop.disabled = false; knop.textContent = 'Deur openen'; melding('De deur openen is niet gelukt'); });
   });
+
+  /* ---------- Omlaag vegen om te verversen ----------
+     Een webapp op het beginscherm heeft geen ververs-knop en blijft anders op een oude versie
+     hangen. Omlaag vegen (of slepen met de muis) haalt de nieuwste versie op, voorbij de
+     opslag van de browser. Begint de veeg in een kamer of een menu, dan gebeurt er niets. */
+  (function(){
+    var el = $('ververs'), svg = el.firstChild, y0 = null, x0 = 0, dy = 0, actief = false, bezig = false, DREMPEL = 95;
+    function mag(doel){ return !(doel && doel.closest && doel.closest('.kamer, input, textarea, .kaart, #paneel, #koppel')); }
+    function teken(){
+      var ver = Math.min(dy, 170) * 0.75;
+      el.classList.remove('terug');
+      el.style.opacity = Math.min(1, dy / 50);
+      el.style.transform = 'translateY(' + ver + 'px)';
+      svg.style.transform = 'rotate(' + Math.min(dy, 170) * 2.2 + 'deg)';
+      el.classList.toggle('los', dy >= DREMPEL);
+    }
+    function weg(){ el.classList.add('terug'); el.classList.remove('los'); el.style.opacity = 0; el.style.transform = 'translateY(0)'; }
+    function ververs(){
+      bezig = true;
+      el.classList.add('terug', 'bezig'); el.classList.remove('los');
+      el.style.opacity = 1; el.style.transform = 'translateY(72px)'; svg.style.transform = '';
+      var klaar = function(){ location.reload(); };
+      // Eerst de pagina vers ophalen (dat vernieuwt ook de opslag van de browser), dan herladen
+      var haal = window.fetch ? fetch(location.href.split('#')[0], { cache: 'reload' }) : Promise.resolve();
+      haal.then(klaar, function(){
+        bezig = false; el.classList.remove('bezig'); weg();
+        melding('Verversen lukt niet: geen verbinding');
+      });
+    }
+    function begin(x, y, doel){ if (bezig || !mag(doel)) { y0 = null; return; } y0 = y; x0 = x; dy = 0; actief = false; }
+    function beweeg(x, y){
+      if (y0 === null) return;
+      var d = y - y0, zij = Math.abs(x - x0);
+      if (!actief) {
+        if (zij > 24 || d < -12) { y0 = null; return; }       // zijwaarts of omhoog: geen ververs-veeg
+        if (d < 14 || d < zij * 1.5) return;
+        actief = true;
+      }
+      dy = Math.max(0, d); teken();
+    }
+    function einde(){
+      if (y0 === null) return;
+      var doe = actief && dy >= DREMPEL;
+      y0 = null; actief = false;
+      if (doe) ververs(); else weg();
+    }
+    document.addEventListener('touchstart', function(e){
+      if (e.touches.length !== 1) { y0 = null; weg(); return; }
+      begin(e.touches[0].clientX, e.touches[0].clientY, e.target);
+    }, { passive: true });
+    document.addEventListener('touchmove', function(e){ if (e.touches.length === 1) beweeg(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+    document.addEventListener('touchend', einde, { passive: true });
+    document.addEventListener('touchcancel', function(){ y0 = null; actief = false; if (!bezig) weg(); }, { passive: true });
+    // Met de muis (computer): omlaag slepen
+    document.addEventListener('pointerdown', function(e){ if (e.pointerType === 'mouse' && e.button === 0) begin(e.clientX, e.clientY, e.target); });
+    document.addEventListener('pointermove', function(e){ if (e.pointerType === 'mouse') beweeg(e.clientX, e.clientY); });
+    document.addEventListener('pointerup', function(e){ if (e.pointerType === 'mouse') einde(); });
+  })();
 
   /* ---------- Koppelen ----------
      Het adres van het script staat in de pagina (API_URL) of komt uit de link; de sleutel
