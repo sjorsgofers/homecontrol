@@ -180,9 +180,46 @@ input[type=range]:disabled{opacity:.35}
   transform:translate(-50%,20px);opacity:0;pointer-events:none;text-align:center;font-size:16px;
   background:#2a1b1a;border:1px solid rgba(229,138,112,.5);color:#ffd9cf;transition:all .25s var(--ease)}
 #melding.toon{opacity:1;transform:translate(-50%,0)}
-/* Partyknop: zelfde kader als het weer, half zo breed, met een gedempt discobolletje */
+[hidden]{display:none !important}
+
+/* ---------- Weer: groot kader met geanimeerd icoon ---------- */
+.weer{display:flex;align-items:center;margin-top:calc(var(--s)*16);
+  padding:calc(var(--s)*10) calc(var(--s)*24) calc(var(--s)*10) calc(var(--s)*14);
+  border-radius:calc(var(--s)*18);background:var(--vlak);box-shadow:var(--schaduw)}
+.weer-icoon svg{display:block;width:calc(var(--s)*68);height:calc(var(--s)*68);overflow:visible}
+.weer-tekst{display:flex;flex-direction:column;margin-left:calc(var(--s)*12);white-space:nowrap}
+.weer-tekst b{font-size:calc(var(--s)*36);font-weight:400;line-height:1.05}
+.weer-tekst small{margin-top:calc(var(--s)*3);font-size:calc(var(--s)*16);color:var(--muted)}
+.w-zon{fill:#f6cf4f;stroke:#f6cf4f;stroke-width:2.6;stroke-linecap:round}
+.w-stralen{transform-box:fill-box;transform-origin:center;animation:draai 26s linear infinite}
+.w-gloed{fill:#f6cf4f;opacity:.16;transform-box:fill-box;transform-origin:center;animation:ademen 4s ease-in-out infinite}
+.w-maan{fill:#e9eef8}
+.w-ster{fill:#e9eef8;animation:twinkel 3.2s ease-in-out infinite}
+.w-ster.b{animation-delay:1.1s}
+.w-ster.c{animation-delay:2s}
+.w-wolk{fill:#b9c5db}
+.w-wolk.donker{fill:#8492ad}
+.w-zweef{animation:zweef 7s ease-in-out infinite}
+.w-drup{stroke:#8cc0ff;stroke-width:2.4;stroke-linecap:round;fill:none;animation:val 1.1s linear infinite}
+.w-drup.b{animation-delay:.37s}
+.w-drup.c{animation-delay:.74s}
+.w-drup.licht{stroke-width:1.9;animation-duration:1.7s}
+.w-vlok{fill:#eef3fb;animation:val 2.6s linear infinite}
+.w-vlok.b{animation-delay:.9s}
+.w-vlok.c{animation-delay:1.7s}
+.w-bliksem{fill:#ffd84a;animation:flits 3.4s linear infinite}
+.w-mist{stroke:#b9c5db;stroke-width:2.8;stroke-linecap:round;fill:none;animation:zweef 5s ease-in-out infinite}
+.w-mist.b{animation-delay:-1.6s;opacity:.75}
+.w-mist.c{animation-delay:-3.2s;opacity:.5}
+@keyframes ademen{50%{transform:scale(1.18);opacity:.26}}
+@keyframes twinkel{0%,100%{opacity:.25}50%{opacity:1}}
+@keyframes zweef{0%,100%{transform:translateX(-1.6px)}50%{transform:translateX(1.6px)}}
+@keyframes val{0%{transform:translateY(-3px);opacity:0}20%{opacity:1}80%{opacity:1}100%{transform:translateY(7px);opacity:0}}
+@keyframes flits{0%,58%{opacity:0}60%{opacity:1}64%{opacity:.15}68%{opacity:1}80%,100%{opacity:0}}
+
+/* Partyknop: klein kader naast het weer, met een gedempt discobolletje */
 .rij{display:flex;align-items:center}
-.rij .chip + .chip{margin-left:calc(var(--s)*12)}
+.rij > * + *{margin-left:calc(var(--s)*12)}
 #party{appearance:none;-webkit-appearance:none;justify-content:center;width:calc(var(--s)*54);padding:0;cursor:pointer;
   transition:background .4s}
 #party svg{margin:0;width:calc(var(--s)*26);height:calc(var(--s)*26);stroke:#6f7b96;stroke-width:1.7;transition:stroke .4s}
@@ -211,7 +248,7 @@ html.staand,html.staand body{height:auto;min-height:100%;overflow-y:auto}
     <div class="onder">
       <div id="overig"></div>
       <div class="rij">
-        <div class="chip" id="weer" hidden><span id="weerIcoon"></span><span id="weerTemp"></span></div>
+        <div class="weer" id="weer" hidden><span class="weer-icoon" id="weerIcoon"></span><span class="weer-tekst"><b id="weerTemp"></b><small id="weerOms"></small></span></div>
         <button class="chip" id="party" aria-label="Partymodus"></button>
       </div>
     </div>
@@ -321,18 +358,50 @@ html.staand,html.staand body{height:auto;min-height:100%;overflow-y:auto}
   }
   klok(); setInterval(klok, 5000);
 
-  /* ---------- Weer (alleen als lat/lon zijn meegegeven) ---------- */
-  function toonWeer(graden, code){
-    var ic = code <= 1 ? ICOON.zon : code < 50 ? ICOON.wolk : (code >= 71 && code <= 77) || code === 85 || code === 86 ? ICOON.sneeuw : ICOON.regen;
-    $('weerIcoon').innerHTML = ic;
+  /* ---------- Weer (alleen als lat/lon zijn meegegeven) ----------
+     Geanimeerde iconen, opgebouwd uit losse onderdelen op een vlak van 48 x 48.
+     Testen zonder te wachten op het weer: zet #weertest=<code>,<dag 1/0>,<graden> in de link,
+     bv. #weertest=95,0,7 (onweer in de nacht). Codes: de WMO-weercodes van open-meteo. */
+  var WEER = {
+    zon: '<circle class="w-gloed" cx="24" cy="24" r="13"/><g class="w-zon"><circle cx="24" cy="24" r="8.5"/>' +
+      '<g class="w-stralen"><path d="M24 6.5v4M24 37.5v4M6.5 24h4M37.5 24h4M11.6 11.6l2.9 2.9M36.4 11.6l-2.9 2.9M11.6 36.4l2.9-2.9M36.4 36.4l-2.9-2.9"/></g></g>',
+    maan: '<mask id="maanMasker"><rect width="48" height="48" fill="#fff"/><circle cx="31.5" cy="18.5" r="11.5" fill="#000"/></mask>' +
+      '<circle class="w-maan" cx="23" cy="25" r="14" mask="url(#maanMasker)"/>' +
+      '<circle class="w-ster" cx="36" cy="12" r="1.5"/><circle class="w-ster b" cx="41" cy="23" r="1.1"/><circle class="w-ster c" cx="30" cy="20" r="1"/>',
+    wolk: function(donker){ return '<g class="w-wolk' + (donker ? ' donker' : '') + '"><circle cx="16" cy="28" r="6.5"/><circle cx="25" cy="22.5" r="9.5"/><circle cx="34" cy="27.5" r="6.5"/><rect x="16" y="26" width="18" height="8.5"/></g>'; },
+    druppels: function(licht){ var k = 'w-drup' + (licht ? ' licht' : ''); return '<path class="' + k + '" d="M18 33l-2 6"/><path class="' + k + ' b" d="M25.5 33l-2 6"/><path class="' + k + ' c" d="M33 33l-2 6"/>'; },
+    vlokken: '<circle class="w-vlok" cx="17" cy="35" r="1.7"/><circle class="w-vlok b" cx="25" cy="36" r="1.7"/><circle class="w-vlok c" cx="33" cy="35" r="1.7"/>',
+    bliksem: '<path class="w-bliksem" d="M26.5 29l-7 10h5l-2.5 8 9-11.5h-5l3-6.5z"/>',
+    mist: '<path class="w-mist" d="M9 18h30"/><path class="w-mist b" d="M12 26h26"/><path class="w-mist c" d="M9 34h30"/>'
+  };
+  function weerBeeld(code, dag){
+    var hemel = dag ? WEER.zon : WEER.maan, deel, tekst;
+    function klein(inhoud){ return '<g transform="translate(15 -2) scale(.62)">' + inhoud + '</g>'; }
+    function hoog(inhoud){ return '<g transform="translate(0 -8)"><g class="w-zweef">' + inhoud + '</g></g>'; }
+    if (code <= 1) { deel = hemel; tekst = dag ? (code === 0 ? 'Zonnig' : 'Vrijwel onbewolkt') : 'Helder'; }
+    else if (code === 2) { deel = klein(hemel) + '<g transform="translate(-3 5)"><g class="w-zweef">' + WEER.wolk() + '</g></g>'; tekst = 'Half bewolkt'; }
+    else if (code === 3) { deel = '<g class="w-zweef">' + WEER.wolk() + '</g>'; tekst = 'Bewolkt'; }
+    else if (code === 45 || code === 48) { deel = WEER.mist; tekst = 'Mist'; }
+    else if (code >= 51 && code <= 57) { deel = hoog(WEER.wolk()) + WEER.druppels(true); tekst = 'Motregen'; }
+    else if ((code >= 71 && code <= 77) || code === 85 || code === 86) { deel = hoog(WEER.wolk()) + WEER.vlokken; tekst = 'Sneeuw'; }
+    else if (code >= 95) { deel = hoog(WEER.wolk(true)) + WEER.bliksem + '<g transform="translate(2 0)">' + WEER.druppels() + '</g>'; tekst = 'Onweer'; }
+    else { deel = hoog(WEER.wolk(code === 65 || code === 67 || code === 82)) + WEER.druppels(); tekst = code >= 80 ? 'Buien' : 'Regen'; }
+    return { svg: '<svg viewBox="0 0 48 48" aria-hidden="true">' + deel + '</svg>', tekst: tekst };
+  }
+  function toonWeer(graden, code, dag){
+    var b = weerBeeld(Number(code), Number(dag) !== 0);
+    $('weerIcoon').innerHTML = b.svg;
     $('weerTemp').textContent = Math.round(graden) + '°C';
+    $('weerOms').textContent = b.tekst;
     $('weer').hidden = false;
   }
   function weer(){
+    var proef = par('weertest');
+    if (proef) { var p = proef.split(','); toonWeer(p[2] == null ? 12 : Number(p[2]), p[0], p[1] == null ? 1 : p[1]); return; }
     if (!LAT || !LON) return;
-    fetch('https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(LAT) + '&longitude=' + encodeURIComponent(LON) + '&current=temperature_2m,weather_code')
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(LAT) + '&longitude=' + encodeURIComponent(LON) + '&current=temperature_2m,weather_code,is_day')
       .then(function(r){ return r.json(); })
-      .then(function(j){ if (j && j.current) toonWeer(j.current.temperature_2m, j.current.weather_code); })
+      .then(function(j){ if (j && j.current) toonWeer(j.current.temperature_2m, j.current.weather_code, j.current.is_day); })
       .catch(function(){});
   }
 
@@ -707,7 +776,7 @@ html.staand,html.staand body{height:auto;min-height:100%;overflow-y:auto}
   /* ---------- Demo ---------- */
   function demoData(){
     $('demo').hidden = false;
-    if (!LAT || !LON) toonWeer(12, 3);
+    if (!LAT || !LON) toonWeer(12, 2, 1);
     function L(id, name, on, b){ return { id:id, name:name, online:true, on:on, bright:b }; }
     return [
       { id:'slaap', name:'Slaapkamer', lamps:[L('s1','Plafond',true,100), L('s2','Nachtlampje',true,60)] },
