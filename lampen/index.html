@@ -1287,7 +1287,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     });
   });
 
-  /* ---------- Kachel (Tuya, via de web-app) ----------
+  /* ---------- Kachel (Tuya; de brug thuis schakelt hem rechtstreeks) ----------
      Het knopje verschijnt alleen als er een kachel is gevonden. Tik = aan of uit. */
   var kachel = null, kachelBezig = false;
   $('kachel').innerHTML = ICOON.kachel;
@@ -1302,7 +1302,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
   }
   function haalKachel(){
     if (DEMO || !KEY || kachelBezig || document.hidden) return;
-    vraag({ action: 'kachel' }, true).then(function(j){
+    vraag({ action: 'kachel' }).then(function(j){
       if (kachelBezig) return;
       kachel = (j && j.kachel && j.kachel.ok) ? j.kachel : null;
       tekenKachel();
@@ -1314,7 +1314,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     if (DEMO) { kachel.aan = wens; tekenKachel(); return; }
     if (!kachel.online) { melding('De kachel is niet bereikbaar'); return; }
     kachelBezig = true; kachel.aan = wens; tekenKachel();
-    vraag({ action: 'kachel', on: wens }, true).then(function(j){
+    vraag({ action: 'kachel', on: wens }).then(function(j){
       kachelBezig = false;
       if (j && j.kachel && j.kachel.ok) { kachel = j.kachel; setTimeout(haalKachel, 5000); }
       else { kachel.aan = !wens; melding('De kachel reageert niet'); }

@@ -85,6 +85,7 @@ class Lamp:
         self.sleutel = info.get("key") or ""
         dps = info.get("dps") or {}
         self.dp_aan = next((str(dps[c]) for c in AAN_CODES if c in dps), None)
+        self.kachel = bool(info.get("kachel"))   # geen lamp: de kachel, met een eigen knop op het dashboard
         self.dp_helder = next((str(dps[c]) for c in HELDER_CODES if c in dps), None)
         # Nieuwe lampen (dp 22) lopen van 10 tot 1000, oude (dp 2/3) van 25 tot 255
         self.bereik = (10, 1000) if self.dp_helder and int(self.dp_helder) >= 20 else (25, 255)
@@ -558,6 +559,22 @@ def verwerk(p, afzender="onbekend"):
         if p.get("opdracht") == "open":
             INTERCOM.open()      # weigert buiten de minuten na het aanbellen
         return {"ok": True, "brug": True, "intercom": INTERCOM.stand()}
+    if actie == "kachel":
+        k = next((l for l in LAMPEN.values() if l.kachel), None)
+        aan = p.get("on")
+        if aan not in (None, ""):
+            aan = aan if isinstance(aan, bool) else str(aan).lower() in ("true", "1")
+        else:
+            aan = None
+        if k and k.lokaal:
+            # Rechtstreeks over het thuisnetwerk: snel, en buiten het apparatenlimiet van de Tuya-cloud om
+            if aan is not None and not k.zet(aan, None):
+                return {"ok": True, "brug": True, "kachel": {"ok": False, "fout": "De kachel reageert niet"}}
+            return {"ok": True, "brug": True, "kachel": {"ok": True, "naam": k.naam, "online": True, "aan": k.aan}}
+        q = {"action": "kachel"}
+        if aan is not None:
+            q["on"] = "true" if aan else "false"
+        return cloud(q)
     if actie in ("scene", "scenes", "agenda"):
         q = {"action": actie}
         if p.get("name"):

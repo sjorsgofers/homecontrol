@@ -427,6 +427,10 @@ function kachel_(aan) {
 function lokaal_() {
   var ids = {};
   apparaten_().lampen.forEach(function (l) { ids[l.id] = true; });
+  /* De kachel gaat mee: de brug schakelt hem rechtstreeks, buiten de cloud om */
+  var kachel = '';
+  try { kachel = kachelApparaat_().id || ''; } catch (e) {}
+  if (kachel) ids[kachel] = true;
   var lijst = alleApparaten_().filter(function (d) { return ids[d.id]; });
   var verzoeken = lijst.map(function (d) {
     return verzoek_('GET', '/v2.0/cloud/thing/' + d.id + '/shadow/properties');
@@ -438,7 +442,7 @@ function lokaal_() {
       var j = JSON.parse(antwoorden[i].getContentText());
       ((j.result && j.result.properties) || []).forEach(function (p) { dps[p.code] = p.dp_id; });
     } catch (e) {}
-    return { id: d.id, name: d.name, key: d.local_key, dps: dps };
+    return { id: d.id, name: d.name, key: d.local_key, dps: dps, kachel: d.id === kachel ? true : undefined };
   });
 }
 
