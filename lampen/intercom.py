@@ -4,8 +4,9 @@ Ring Intercom voor de brug (brug.py) — optioneel.
 
 Laat het dashboard horen dat er beneden wordt aangebeld en de deur openen. Ring heeft geen
 officiële koppeling: dit gebruikt de onofficiële bibliotheek python-ring-doorbell en loopt
-volledig via de dienst van Ring. Het aanbelsignaal komt als pushbericht binnen en kan een
-enkele keer gemist worden; gebruik dan de Ring-app.
+volledig via de dienst van Ring. Het aanbelsignaal komt als pushbericht binnen; omdat die
+berichten van Ring regelmatig wegblijven, kijkt de brug daarnaast om de paar seconden in de
+aanbelgeschiedenis van Ring, zolang er een dashboard open staat.
 
 Veiligheid: de deur gaat alleen open in de eerste minuten nadat er is aangebeld
 ("ring_venster" in lampen-config.json, in seconden, standaard 120). Daarbuiten weigert de
@@ -33,6 +34,8 @@ import time
 AGENT = "LampenDashboard/1.0"
 VENSTER = 120            # seconden na het aanbellen waarin de deur open mag
 VERVERS_ELKE = 12 * 3600  # zo vaak opnieuw aanmelden voor pushberichten (ze vallen anders soms stil)
+PEIL_ELKE = 4            # zo vaak (seconden) in de aanbelgeschiedenis kijken, als vangnet naast de pushberichten
+PEIL_ZOLANG = 30         # ... en alleen zolang een dashboard in de laatste zoveel seconden om de stand vroeg
 
 
 def _pad(map_, naam):
@@ -72,6 +75,8 @@ class Intercom:
         self.gebeld = None       # tijdstip (epoch) van de laatste keer aanbellen
         self.geopend = None      # tijdstip waarop de deur via het dashboard is geopend
         self.fout = None
+        self.gevraagd = 0        # laatste keer dat een dashboard om de stand vroeg
+        self.peilt = False
         self.lus = asyncio.new_event_loop()
         threading.Thread(target=self.lus.run_forever, daemon=True).start()
 
@@ -108,6 +113,9 @@ class Intercom:
             self.fout = str(e) or type(e).__name__
             self.apparaat = None
             raise
+        if not self.peilt:
+            self.peilt = True
+            threading.Thread(target=self._peil_lus, daemon=True).start()
         return self.apparaat.name
 
     async def _luister(self):
@@ -129,17 +137,43 @@ class Intercom:
                 return
             if self.apparaat is not None and int(g.doorbot_id) != int(self.apparaat.device_api_id):
                 return
-            # Het tijdstip van Ring zelf telt: een bericht dat te laat binnenkomt opent geen venster
-            wanneer = min(float(g.now), time.time())
-            if time.time() - wanneer > self.venster:
-                self.log("intercom: aanbelbericht kwam te laat binnen, genegeerd")
-                return
-            if self.gebeld is None or wanneer > self.gebeld:
-                self.gebeld = wanneer
-                self.geopend = None
-                self.log("intercom: er wordt aangebeld")
+            self._aangebeld(float(g.now), "pushbericht")
         except Exception as e:
             self.log(f"intercom: bericht niet begrepen ({type(e).__name__})")
+
+    def _aangebeld(self, wanneer, bron):
+        # Het tijdstip van Ring zelf telt: een melding die te laat binnenkomt opent geen venster
+        nu = time.time()
+        wanneer = min(wanneer, nu)
+        if nu - wanneer > self.venster:
+            if bron == "pushbericht":
+                self.log("intercom: aanbelbericht kwam te laat binnen, genegeerd")
+            return
+        # Dezelfde keer aanbellen komt via beide wegen binnen, met een iets ander tijdstip
+        if self.gebeld is None or wanneer > self.gebeld + 3:
+            self.gebeld = wanneer
+            self.geopend = None
+            self.log(f"intercom: er wordt aangebeld ({bron}, {int(nu - wanneer)} s na het bellen)")
+
+    def _peil_lus(self):
+        """Vangnet: de pushberichten van Ring blijven vaak weg, de geschiedenis klopt wel."""
+        async def laatste():
+            return await self.apparaat.async_history(limit=1)
+        storing = False
+        while True:
+            time.sleep(PEIL_ELKE)
+            if not self.apparaat or time.time() - self.gevraagd > PEIL_ZOLANG:
+                continue
+            try:
+                for g in self._doe(laatste(), timeout=20) or []:
+                    if g.get("kind") == "ding" and g.get("created_at"):
+                        self._aangebeld(g["created_at"].timestamp(), "geschiedenis")
+                storing = False
+            except Exception as e:
+                if not storing:
+                    self.log(f"intercom: geschiedenis opvragen lukt niet ({type(e).__name__}: {e})")
+                storing = True
+                time.sleep(60)
 
     def ververs(self):
         """Opnieuw aanmelden voor pushberichten en de gegevens bijwerken."""
@@ -156,7 +190,7 @@ class Intercom:
     def stand(self):
         if not self.apparaat:
             return {"ok": False, "fout": self.fout or "niet gekoppeld"}
-        nu = time.time()
+        nu = self.gevraagd = time.time()
         return {"ok": True, "naam": self.apparaat.name, "accu": self.apparaat.battery_life,
                 "gebeld": int(self.gebeld * 1000) if self.gebeld else None,
                 "open_mag": self.open_mag(),
@@ -255,6 +289,7 @@ def main():
         print(f"Ik luister {args.luister} seconden; bel beneden aan om te testen...")
         einde = time.time() + args.luister
         while time.time() < einde and not i.gebeld:
+            i.gevraagd = time.time()
             time.sleep(1)
         print("Aangebeld: ja" if i.gebeld else "Geen aanbelbericht ontvangen")
 
