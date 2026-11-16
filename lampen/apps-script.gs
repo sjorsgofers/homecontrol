@@ -8,7 +8,9 @@
      TUYA_ID      Access ID / Client ID van je Tuya cloud-project
      TUYA_SECRET  Access Secret / Client Secret
      TUYA_REGIO   eu (standaard), us, cn of in
-     SLEUTEL      zelfgekozen wachtwoord; de pagina moet dit meesturen
+     SLEUTEL      zelfgekozen wachtwoord; alleen nog voor de brug thuis (brug.py)
+                  Bewoners loggen in met een account (Supabase); het dashboard stuurt hun
+                  inlogbewijs mee en dit script laat Supabase dat controleren.
      KACHEL       (optioneel) naam of apparaat-ID van de kachel; leeg = zelf zoeken
      RUIMTES      (optioneel) eigen indeling als JSON, bijvoorbeeld
                   {"Woonkamer":["Plafond","Staande lamp"],"Keuken":["Spots"]}
@@ -38,6 +40,9 @@ var KLEUR_CODES = ['colour_data_v2', 'colour_data'];   /* kleur als {h, s, v} */
 var KACHEL_CATEGORIEEN = ['qn', 'kt', 'rs', 'dr'];
 var KACHEL_NAAM = /kachel|heater|eurom|verwarming/i;
 var KACHEL_AAN_CODES = ['switch', 'switch_1', 'Power', 'power'];
+/* Supabase-project met de accounts van de bewoners. Dit is de openbare sleutel; die mag iedereen zien. */
+var SUPABASE_URL = 'https://kjlsdzeyujvguepunetx.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_E5KHsSaq5x3tWeFGaf7Xpg_pATO_i9u';
 
 /* ---------------------------- web-app ---------------------------- */
 
@@ -56,7 +61,20 @@ function antwoord_(obj) {
 function verwerk_(p) {
   try {
     var sleutel = prop_('SLEUTEL');
-    if (!sleutel || String(p.key || '') !== sleutel) return { ok: false, fout: 'Onjuiste sleutel' };
+    var wie;
+    if (sleutel && String(p.key || '') === sleutel) {
+      wie = { naam: 'sleutel', rol: 'eigenaar', soort: 'sleutel' };
+    } else if (p.token) {
+      wie = lid_(String(p.token));
+      if (wie.fout) return { ok: false, fout: wie.fout, geweigerd: true };
+    } else {
+      return p.key ? { ok: false, fout: 'Onjuiste sleutel' } : { ok: false, fout: 'Niet ingelogd', geweigerd: true };
+    }
+    if (p.action === 'ik') return { ok: true, ik: wie };
+    /* De lokale sleutels van de lampen en het adres van de brug zijn alleen voor de brug zelf */
+    if ((p.action === 'lokaal' || p.action === 'brug') && wie.soort !== 'sleutel') {
+      return { ok: false, fout: 'Alleen de brug thuis mag dit' };
+    }
 
     if (p.action === 'set') {
       var ids = p.ids;
@@ -375,6 +393,34 @@ function agenda_() {
     };
   });
   cache.put('agenda', JSON.stringify(uit), 300);
+  return uit;
+}
+
+/* ----------------------------- inloggen ----------------------------- */
+
+/* Controleert een inlogbewijs bij Supabase en zoekt het account op in de tabel 'leden'.
+   Geeft { naam, rol, soort: 'lid' } of { fout }. Vijf minuten onthouden per bewijs. */
+function lid_(bewijs) {
+  if (bewijs.length > 4000) return { fout: 'Niet ingelogd' };
+  var cache = CacheService.getScriptCache();
+  var k = 'lid_' + sha256_(bewijs);
+  var c = cache.get(k);
+  if (c) return JSON.parse(c);
+  var opties = { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + bewijs }, muteHttpExceptions: true };
+  var a = UrlFetchApp.fetch(SUPABASE_URL + '/auth/v1/user', opties);
+  var uit;
+  if (a.getResponseCode() === 401 || a.getResponseCode() === 403) {
+    uit = { fout: 'Niet ingelogd' };
+  } else if (a.getResponseCode() !== 200) {
+    return { fout: 'De inlogdienst antwoordt niet' };
+  } else {
+    var id = JSON.parse(a.getContentText()).id;
+    var b = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/leden?select=naam,rol&user_id=eq.' + encodeURIComponent(id), opties);
+    if (b.getResponseCode() !== 200) return { fout: 'De inlogdienst antwoordt niet' };
+    var rijen = JSON.parse(b.getContentText());
+    uit = rijen.length ? { naam: rijen[0].naam, rol: rijen[0].rol, soort: 'lid' } : { fout: 'Dit account heeft nog geen toegang' };
+  }
+  cache.put(k, JSON.stringify(uit), uit.fout ? 30 : 300);
   return uit;
 }
 

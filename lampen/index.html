@@ -368,15 +368,15 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
 #demo{appearance:none;-webkit-appearance:none;position:fixed;right:12px;bottom:10px;z-index:3;padding:7px 14px;border:0;
   border-radius:999px;background:var(--vlak);box-shadow:3px 4px 10px var(--schaduw-d);font-size:13px;color:var(--muted);cursor:pointer}
 
-/* ---------- Koppelen: sleutel één keer per apparaat invullen ---------- */
-#koppel{position:fixed;left:0;top:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;justify-content:center;
+/* ---------- Inloggen en het accountscherm (met gasten) ---------- */
+#koppel,#account{position:fixed;left:0;top:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;justify-content:center;
   padding:20px;background:var(--paneel-achter)}
 .kaart{width:420px;max-width:100%;padding:24px;border-radius:20px;background:var(--vel);color:var(--txt);font-size:16px;
   box-shadow:8px 10px 28px var(--schaduw-d)}
 .kaart b{display:block;font-size:22px;font-weight:500}
 .kaart p{margin:8px 0 14px;color:var(--muted);line-height:1.4}
 .kaart label{display:block;margin-top:12px;font-size:14px;color:var(--muted)}
-.kaart input{display:block;width:100%;height:46px;margin-top:6px;padding:0 14px;border:1px solid var(--lijn);border-radius:12px;
+.kaart input,.kaart select{display:block;width:100%;height:46px;margin-top:6px;padding:0 14px;border:1px solid var(--lijn);border-radius:12px;
   background:var(--lamp-bg);color:var(--txt);font:inherit;font-size:17px;outline:none;-webkit-user-select:text;user-select:text}
 .kaart input:focus{border-color:var(--accent)}
 .kaart .fout{min-height:20px;margin-top:10px;font-size:14px;color:var(--rood)}
@@ -385,6 +385,15 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
   font-size:16px;color:var(--muted);cursor:pointer}
 .kaart button[type=submit]{background:var(--accent-grad);color:var(--accent-ink);font-weight:500}
 .kaart button:disabled{opacity:.5}
+.kaart .link{display:block;width:100%;height:auto;margin-top:8px;padding:8px 0;font-size:14px;text-align:center;text-decoration:underline}
+#account .kaart{max-height:92vh;overflow-y:auto}
+.gast{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:10px 14px;border:1px solid var(--lijn);
+  border-radius:12px;background:var(--lamp-bg);font-size:15px}
+.gast small{display:block;font-size:13px;color:var(--muted)}
+.gast.oud{opacity:.55}
+.kaart .gast button{height:36px;padding:0 12px;font-size:14px;color:var(--rood)}
+#gastLink input{font-size:13px}
+#gastLeeg{margin-top:8px;font-size:14px;color:var(--muted)}
 
 /* ---------- Staand scherm: klok boven, plattegrond onder; alles blijft in beeld ---------- */
 .staand #app{flex-direction:column;justify-content:space-between}
@@ -466,14 +475,17 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
 </div>
 <div id="ververs"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></div>
 <div id="melding"></div>
-<button id="demo" hidden>Voorbeeld · tik om te koppelen</button>
+<button id="demo" hidden>Voorbeeld · tik om in te loggen</button>
 
 <div id="koppel" hidden>
   <form class="kaart" id="koppelForm">
-    <b>Dit apparaat koppelen</b>
-    <p>Vul één keer je sleutel in. Hij wordt alleen op dit apparaat bewaard.</p>
-    <label>Sleutel
-      <input id="koppelSleutel" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <b id="koppelKop">Inloggen</b>
+    <p id="koppelUitleg">Log in met je account om het huis te bedienen.</p>
+    <label>E-mailadres
+      <input id="koppelMail" type="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </label>
+    <label>Wachtwoord
+      <input id="koppelWw" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">
     </label>
     <label>Plaats voor het weer (optioneel)
       <input id="koppelPlaats" type="text" autocomplete="off" autocorrect="off" spellcheck="false">
@@ -481,19 +493,58 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     <div class="fout" id="koppelFout"></div>
     <div class="knoppen">
       <button type="button" id="koppelDemo">Voorbeeld bekijken</button>
-      <button type="submit" id="koppelOk">Koppelen</button>
+      <button type="submit" id="koppelOk">Inloggen</button>
     </div>
+    <button type="button" class="link" id="koppelWissel">Nog geen account? Account maken</button>
   </form>
+</div>
+
+<div id="account" hidden>
+  <div class="kaart">
+    <b>Account</b>
+    <p id="accInfo"></p>
+    <div id="accGasten" hidden>
+      <label>Gasten</label>
+      <div id="gastLijst"></div>
+      <div id="gastLeeg">Er zijn geen gasten.</div>
+      <label>Nieuwe gast
+        <input id="gastNaam" type="text" maxlength="40" placeholder="Naam, bijvoorbeeld Oppas" autocomplete="off">
+      </label>
+      <label>Toegang voor
+        <select id="gastDuur">
+          <option value="6">6 uur</option>
+          <option value="24" selected>1 dag</option>
+          <option value="72">3 dagen</option>
+          <option value="168">1 week</option>
+        </select>
+      </label>
+      <button type="button" class="th-optie" id="gastMaak">Gastlink maken</button>
+      <div id="gastLink" hidden>
+        <label>Stuur deze link naar je gast
+          <input id="gastUrl" type="text" readonly>
+        </label>
+        <button type="button" class="th-optie" id="gastDeel">Link delen</button>
+      </div>
+    </div>
+    <div class="fout" id="accFout"></div>
+    <div class="knoppen">
+      <button type="button" id="accUit">Uitloggen</button>
+      <button type="submit" id="accDicht">Klaar</button>
+    </div>
+  </div>
 </div>
 
 <script>
 (function(){
   /* ---------- Instellingen ----------
-     API_URL is de /exec-URL van apps-script.gs. Die mag openbaar zijn: zonder de sleutel
-     doet het script niets. De SLEUTEL hoort hier NOOIT te staan; die vult de gebruiker
-     één keer per apparaat in (koppelscherm) of komt uit de link:
-     ?api=<exec-url>&key=<SLEUTEL>  (lampen.py doet dat vanzelf).
-     Optioneel voor het weer: &lat=<breedtegraad>&lon=<lengtegraad>. */
+     API_URL is de /exec-URL van apps-script.gs. Die mag openbaar zijn: zonder inlog doet het
+     script niets. Bewoners loggen in met een account (Supabase, zie toegang.py); gasten
+     krijgen een link met een tijdelijke code (#gast=...&brug=...). De oude gedeelde SLEUTEL
+     hoort hier NOOIT te staan; een apparaat dat hem nog bewaart blijft werken tot er wordt
+     ingelogd. Optioneel voor het weer: &lat=<breedtegraad>&lon=<lengtegraad>.
+     SUPA_KEY is de openbare sleutel van het Supabase-project; die mag iedereen zien. */
+  var SUPA_URL = 'https://kjlsdzeyujvguepunetx.supabase.co';
+  var SUPA_KEY = 'sb_publishable_E5KHsSaq5x3tWeFGaf7Xpg_pATO_i9u';
   var API_URL = 'https://script.google.com/macros/s/AKfycbzsy18kfT-GvO7TcohgXac7oNoJvII6xCuPVNuaOXrgCYJDRBLSG334Mv4da4O8PxliwA/exec';
 
   /* ---------- Scènes ----------
@@ -534,7 +585,14 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
   function bewaar(k, v){ try{ if(v) localStorage.setItem('lampen_'+k, v); return v || localStorage.getItem('lampen_'+k) || ''; }catch(e){ return v || ''; } }
   var apiUitLink = par('api') || (par('id') ? 'https://script.google.com/macros/s/' + par('id') + '/exec' : '');
   var API = bewaar('api', apiUitLink) || API_URL;
-  var KEY = bewaar('key', par('key'));
+  /* Wie is dit apparaat? Een ingelogde bewoner (sessie), een gast (code uit de link) of nog
+     een apparaat met de oude sleutel. KEY is alleen nog 'ja' of leeg: is er iets om mee aan te kloppen? */
+  var sessie = null;
+  try { sessie = JSON.parse(localStorage.getItem('lampen_sessie') || 'null'); } catch (e) {}
+  if (!sessie || !sessie.a || !sessie.r) sessie = null;
+  var GAST = sessie ? '' : bewaar('gast', par('gast'));
+  var OUDE_SLEUTEL = (sessie || GAST) ? '' : bewaar('key', par('key'));
+  var KEY = (sessie || GAST || OUDE_SLEUTEL) ? 'ja' : '';
   var LAT = bewaar('lat', par('lat'));
   var LON = bewaar('lon', par('lon'));
   var POLL = Math.max(20, Number(par('poll')) || 120) * 1000;
@@ -708,12 +766,20 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
   /* Eén aanroep naar de bediening. Is er thuis een brug (brug.py) en is die bereikbaar,
      dan gaat het daarlangs: rechtstreeks over het thuisnetwerk, dus snel. Anders via de
      web-app. Het adres van de brug komt van de web-app en wordt op dit apparaat onthouden. */
-  var BRUG = bewaar('brug', '');
+  var BRUG = bewaar('brug', /^https:\/\//.test(par('brug')) ? par('brug') : '');
   var brugUitTot = 0, viaBrug = false, laatsteStand = 0;
   /* alleenBrug = true: voor wat alleen de brug thuis kan (de kachel schakelen). Dan altijd de brug
      proberen, ook als die net even traag was, er langer op wachten en niet uitwijken naar de web-app. */
   function vraag(opdracht, alleenBrug){
-    var tekst = JSON.stringify(Object.assign({ key: KEY }, opdracht));
+    return inlog().then(function(wie){
+      return vraag2(Object.assign({}, wie, opdracht), alleenBrug).then(function(j){
+        if (j && j.ok === false && (j.geweigerd || j.fout === 'Onjuiste sleutel')) geweigerd(j.fout);
+        return j;
+      });
+    });
+  }
+  function vraag2(opdracht, alleenBrug){
+    var tekst = JSON.stringify(opdracht);
     if (alleenBrug && BRUG) {
       var stop2 = window.AbortController ? new AbortController() : null;
       var timer2 = setTimeout(function(){ if (stop2) stop2.abort(); }, 8000);
@@ -722,6 +788,8 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     }
     function viaWebapp(){
       viaBrug = false;
+      // Gasten kent alleen de brug thuis; de web-app niet
+      if (opdracht.gast) return Promise.resolve({ ok: false, fout: 'De brug thuis is niet bereikbaar' });
       return fetch(API, { method:'POST', body: tekst }).then(function(r){ return r.json(); }).then(function(j){
         if (j && typeof j.brug === 'string' && j.brug !== BRUG) {
           BRUG = j.brug; brugUitTot = 0;
@@ -736,8 +804,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     return fetch(BRUG, { method:'POST', body: tekst, signal: stop ? stop.signal : undefined })
       .then(function(r){ return r.json(); })
       .then(function(j){
-        // Kent de brug deze sleutel niet (bijvoorbeeld na het wijzigen ervan), dan beslist de web-app
-        if (!j || (j.ok === false && j.fout === 'Onjuiste sleutel')) throw new Error('brug weigert');
+        if (!j) throw new Error('leeg antwoord');
         clearTimeout(timer); viaBrug = true; return j;
       })
       .catch(function(){
@@ -745,6 +812,58 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
         clearTimeout(timer); brugUitTot = Date.now() + 60000;
         return viaWebapp();
       });
+  }
+
+  /* ---------- Inloggen (Supabase) ---------- */
+  function supa(pad, body, bewijs){
+    var kop = { apikey: SUPA_KEY, 'Content-Type': 'application/json' };
+    if (bewijs) kop.Authorization = 'Bearer ' + bewijs;
+    return fetch(SUPA_URL + '/auth/v1/' + pad, { method: 'POST', headers: kop, body: JSON.stringify(body || {}) })
+      .then(function(r){
+        return r.text().then(function(tekst){
+          var j = {}; try { j = JSON.parse(tekst || '{}'); } catch (e) {}
+          if (!r.ok) { var f = new Error(j.msg || j.error_description || j.message || 'Inloggen mislukt'); f.status = r.status; f.code = j.error_code || j.error; throw f; }
+          return j;
+        });
+      });
+  }
+  function zetSessie(j){
+    sessie = j && j.access_token ? { a: j.access_token, r: j.refresh_token, e: Date.now() + (j.expires_in || 3600) * 1000,
+      mail: (j.user && j.user.email) || (sessie && sessie.mail) || '' } : null;
+    try { if (sessie) localStorage.setItem('lampen_sessie', JSON.stringify(sessie)); else localStorage.removeItem('lampen_sessie'); } catch (e) {}
+    KEY = (sessie || GAST || OUDE_SLEUTEL) ? 'ja' : '';
+  }
+  function vergeet(wat){ try { localStorage.removeItem('lampen_' + wat); } catch (e) {} }
+  /* Geeft waarmee dit apparaat aanklopt: { token } (bewoner), { gast } of { key } (oude sleutel).
+     Een inlogbewijs is een uur geldig; kort voor het verlopen halen we stil een nieuw. */
+  var verversing = null;
+  function inlog(){
+    if (sessie) {
+      if (sessie.e - Date.now() > 60000) return Promise.resolve({ token: sessie.a });
+      if (!verversing) {
+        verversing = supa('token?grant_type=refresh_token', { refresh_token: sessie.r }).then(function(j){
+          verversing = null; zetSessie(j);
+        }, function(f){
+          verversing = null;
+          // Alleen bij een echte weigering uitloggen; bij een haperende verbinding blijft de sessie staan
+          if (f.status === 400 || f.status === 401 || f.status === 403) { zetSessie(null); toonKoppelen('Je bent uitgelogd. Log opnieuw in.'); }
+          throw new Error('Niet ingelogd');
+        });
+      }
+      return verversing.then(function(){ return { token: sessie.a }; });
+    }
+    if (GAST) return Promise.resolve({ gast: GAST });
+    if (OUDE_SLEUTEL) return Promise.resolve({ key: OUDE_SLEUTEL });
+    return Promise.reject(new Error('Niet ingelogd'));
+  }
+  /* De brug of de web-app laat dit apparaat niet (meer) toe. */
+  function geweigerd(reden){
+    if (!$('koppel').hidden) return;
+    if (GAST) { GAST = ''; vergeet('gast'); KEY = ''; toonKoppelen((reden || 'Deze gasttoegang werkt niet meer') + '.'); return; }
+    if (sessie && reden === 'Dit account heeft nog geen toegang') { toonKoppelen('Dit account heeft nog geen toegang. Een bewoner moet je eerst toevoegen.'); return; }
+    if (sessie) { zetSessie(null); toonKoppelen('Je bent uitgelogd. Log opnieuw in.'); return; }
+    OUDE_SLEUTEL = ''; vergeet('key'); KEY = '';
+    toonKoppelen('Log in met je account.');
   }
 
   function stip(s, tekst){ $('stip').className = 'stip' + (s ? ' '+s : ''); $('stip').title = tekst || ''; }
@@ -768,7 +887,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
       teken();
       meld('geladen: gekoppeld, ' + ruimtes.length + ' ruimtes, ' + innerWidth + 'x' + innerHeight);
     }).catch(function(e){
-      if (String(e.message) === 'Onjuiste sleutel') { toonKoppelen('De sleutel op dit apparaat klopt niet.'); return; }
+      if (!KEY || !$('koppel').hidden) { stip('fout', 'Niet ingelogd'); return; }
       meld('fout bij ophalen: ' + (e.message || e));
       stip('fout', String(e.message || e));
       melding((ruimtes.length ? 'Geen verbinding: ' : 'Kan de lampen niet bereiken: ') + (e.message || e));
@@ -1403,7 +1522,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
      opslag van de browser. Begint de veeg in een kamer of een menu, dan gebeurt er niets. */
   (function(){
     var el = $('ververs'), svg = el.firstChild, y0 = null, x0 = 0, dy = 0, actief = false, bezig = false, DREMPEL = 95;
-    function mag(doel){ return !(doel && doel.closest && doel.closest('.kamer, input, textarea, .kaart, #paneel, #koppel')); }
+    function mag(doel){ return !(doel && doel.closest && doel.closest('.kamer, input, textarea, select, .kaart, #paneel, #koppel, #account')); }
     function teken(){
       var ver = Math.min(dy, 170) * 0.75;
       el.classList.remove('terug');
@@ -1455,12 +1574,35 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     document.addEventListener('pointerup', function(e){ if (e.pointerType === 'mouse') einde(); });
   })();
 
-  /* ---------- Koppelen ----------
-     Het adres van het script staat in de pagina (API_URL) of komt uit de link; de sleutel
-     vult de gebruiker één keer per apparaat in. Hij staat daarna alleen in dat apparaat. */
+  /* ---------- Inloggen ----------
+     Bewoners loggen in met e-mailadres en wachtwoord; het apparaat blijft daarna ingelogd.
+     Een nieuw account mag pas iets nadat een bewoner het heeft toegevoegd (tabel 'leden'). */
+  var nieuwAccount = false;
   function toonKoppelen(fout){
     $('koppelFout').textContent = fout || '';
+    $('account').hidden = true;
     $('koppel').hidden = false;
+  }
+  function zetKoppelStand(nieuw){
+    nieuwAccount = nieuw;
+    $('koppelKop').textContent = nieuw ? 'Account maken' : 'Inloggen';
+    $('koppelUitleg').textContent = nieuw ? 'Kies een wachtwoord. Daarna moet een bewoner je nog toegang geven.'
+                                          : 'Log in met je account om het huis te bedienen.';
+    $('koppelOk').textContent = nieuw ? 'Account maken' : 'Inloggen';
+    $('koppelWissel').textContent = nieuw ? 'Al een account? Inloggen' : 'Nog geen account? Account maken';
+    $('koppelWw').setAttribute('autocomplete', nieuw ? 'new-password' : 'current-password');
+    $('koppelFout').textContent = '';
+  }
+  $('koppelWissel').addEventListener('click', function(){ zetKoppelStand(!nieuwAccount); });
+  function inlogFout(f){
+    var c = f && f.code;
+    if (c === 'invalid_credentials' || c === 'invalid_grant') return 'E-mailadres of wachtwoord klopt niet.';
+    if (c === 'user_already_exists' || c === 'email_exists') return 'Er bestaat al een account met dit e-mailadres. Log in.';
+    if (c === 'weak_password') return 'Kies een langer wachtwoord (minstens 6 tekens).';
+    if (c === 'signup_disabled') return 'Nieuwe accounts aanmaken staat uit. Vraag een bewoner.';
+    if (c === 'email_not_confirmed') return 'Bevestig eerst je e-mailadres via de mail die je kreeg.';
+    if (c === 'over_request_rate_limit' || (f && f.status === 429)) return 'Te veel pogingen. Probeer het over een paar minuten opnieuw.';
+    return (f && f.message) || 'Inloggen mislukt';
   }
   function zoekPlaats(naam){
     return fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=nl&name=' + encodeURIComponent(naam))
@@ -1473,32 +1615,113 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
   }
   $('koppelForm').addEventListener('submit', function(e){
     e.preventDefault();
-    var sleutel = $('koppelSleutel').value.trim(), plaats = $('koppelPlaats').value.trim();
-    if (!API) { $('koppelFout').textContent = 'Deze pagina kent het adres van het script nog niet.'; return; }
-    if (!sleutel) { $('koppelFout').textContent = 'Vul de sleutel in.'; return; }
+    var mail = $('koppelMail').value.trim(), ww = $('koppelWw').value, plaats = $('koppelPlaats').value.trim();
+    if (!mail || !ww) { $('koppelFout').textContent = 'Vul je e-mailadres en wachtwoord in.'; return; }
     $('koppelOk').disabled = true; $('koppelFout').textContent = 'Bezig…';
-    var url = API + (API.indexOf('?') >= 0 ? '&' : '?') + 'action=state&key=' + encodeURIComponent(sleutel) + '&_=' + Date.now();
-    fetch(url, { cache:'no-store' }).then(function(r){ return r.json(); }).then(function(j){
-      if (!j.ok) throw new Error(j.fout === 'Onjuiste sleutel' ? 'De sleutel klopt niet.' : (j.fout || 'Onbekende fout'));
+    var stap = nieuwAccount ? supa('signup', { email: mail, password: ww }) : supa('token?grant_type=password', { email: mail, password: ww });
+    stap.then(function(j){
+      if (!j.access_token) throw new Error('Bevestig eerst je e-mailadres via de mail die je kreeg.');
+      GAST = ''; vergeet('gast'); OUDE_SLEUTEL = ''; vergeet('key');
+      zetSessie(j);
+      $('koppelWw').value = '';
       return plaats ? zoekPlaats(plaats) : null;
-    }).then(function(p){
-      KEY = bewaar('key', sleutel);
+    }, function(f){ throw new Error(inlogFout(f)); }).then(function(p){
       if (p) { LAT = bewaar('lat', p.latitude.toFixed(2)); LON = bewaar('lon', p.longitude.toFixed(2)); }
+      // Mag dit account erin? De brug (of de web-app) kijkt in de ledenlijst
+      return vraag2({ action: 'ik', token: sessie.a });
+    }).then(function(j){
+      if (!j || !j.ok) {
+        if (j && j.fout === 'Dit account heeft nog geen toegang') {
+          zetKoppelStand(false);
+          throw new Error('Je account bestaat, maar heeft nog geen toegang. Een bewoner moet je eerst toevoegen.');
+        }
+        throw new Error((j && j.fout) || 'Onbekende fout');
+      }
       DEMO = false;
-      $('koppel').hidden = true; $('demo').hidden = true; $('koppelSleutel').value = '';
+      $('koppel').hidden = true; $('demo').hidden = true;
       if (!LAT || !LON) $('weer').hidden = true;
       ruimtes = [];
-      haalStand(); weer(); haalAgenda();
+      haalStand(); weer(); haalAgenda(); haalThermo(); haalZuiger(); haalKachel();
     }).catch(function(err){
       $('koppelFout').textContent = err.message || String(err);
     }).then(function(){ $('koppelOk').disabled = false; });
   });
   $('koppelDemo').addEventListener('click', function(){ DEMO = true; $('koppel').hidden = true; haalStand(); haalAgenda(); });
   $('demo').addEventListener('click', function(){ toonKoppelen(); });
-  // Lang indrukken op de datum: koppeling van dit apparaat wijzigen
+
+  /* ---------- Account en gasten ----------
+     Lang indrukken op de datum: wie is hier ingelogd, uitloggen, en (voor bewoners) gasten
+     een tijdelijke link geven. Gasten kent alleen de brug thuis. */
+  function datumTekst(ms){
+    return new Date(ms).toLocaleString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+  function tekenGasten(lijst){
+    var doos = $('gastLijst'); doos.innerHTML = '';
+    $('gastLeeg').hidden = !!(lijst && lijst.length);
+    (lijst || []).forEach(function(g){
+      var d = document.createElement('div');
+      d.className = 'gast' + (g.verlopen ? ' oud' : '');
+      d.innerHTML = '<span>' + esc(g.naam || 'Gast') + '<small>' + (g.verlopen ? 'verlopen op ' : 'tot ') + esc(datumTekst(g.tot)) + '</small></span>';
+      var k = document.createElement('button');
+      k.type = 'button'; k.textContent = g.verlopen ? 'Verwijderen' : 'Intrekken';
+      k.addEventListener('click', function(){
+        k.disabled = true;
+        vraag({ action: 'gast_weg', id: g.id }, true).then(function(j){
+          if (!j.ok) throw new Error(j.fout || 'Mislukt');
+          tekenGasten(j.gasten);
+        }).catch(function(f){ k.disabled = false; $('accFout').textContent = f.message || 'Mislukt'; });
+      });
+      d.appendChild(k); doos.appendChild(d);
+    });
+  }
+  function toonAccount(){
+    if (DEMO || !KEY) { toonKoppelen(); return; }
+    $('accFout').textContent = ''; $('accGasten').hidden = true; $('gastLink').hidden = true;
+    $('accUit').textContent = sessie ? 'Uitloggen' : (GAST ? 'Gasttoegang wissen' : 'Inloggen');
+    $('accInfo').textContent = sessie ? 'Ingelogd' + (sessie.mail ? ' als ' + sessie.mail : '') + '.'
+      : GAST ? 'Dit apparaat heeft gasttoegang.' : 'Dit apparaat gebruikt nog de oude sleutel. Log in met je account.';
+    $('account').hidden = false;
+    vraag({ action: 'ik' }).then(function(j){
+      if (!j || !j.ok || !j.ik) return;
+      if (j.ik.soort === 'gast') $('accInfo').textContent = 'Gasttoegang voor ' + j.ik.naam + ', geldig tot ' + datumTekst(j.ik.tot) + '.';
+      if (j.ik.soort === 'lid' && j.ik.naam) $('accInfo').textContent = 'Ingelogd als ' + j.ik.naam + (sessie && sessie.mail ? ' (' + sessie.mail + ')' : '') + '.';
+      if (j.ik.rol !== 'eigenaar' || !BRUG) return;
+      return vraag({ action: 'gasten' }, true).then(function(g){
+        if (!g || !g.ok) return;
+        $('accGasten').hidden = false; tekenGasten(g.gasten);
+      });
+    }).catch(function(){});
+  }
+  $('accDicht').addEventListener('click', function(){ $('account').hidden = true; });
+  $('account').addEventListener('click', function(e){ if (e.target === $('account')) $('account').hidden = true; });
+  $('accUit').addEventListener('click', function(){
+    if (sessie) supa('logout?scope=local', {}, sessie.a).catch(function(){});
+    zetSessie(null); GAST = ''; vergeet('gast'); OUDE_SLEUTEL = ''; vergeet('key'); KEY = '';
+    ruimtes = []; teken();
+    toonKoppelen();
+  });
+  $('gastMaak').addEventListener('click', function(){
+    var knop = $('gastMaak');
+    knop.disabled = true; $('accFout').textContent = '';
+    vraag({ action: 'gast_maak', naam: $('gastNaam').value.trim(), uren: Number($('gastDuur').value) }, true).then(function(j){
+      if (!j.ok || !j.gast) throw new Error(j.fout || 'Mislukt');
+      var link = location.origin + location.pathname + '#gast=' + encodeURIComponent(j.gast.code) + '&brug=' + encodeURIComponent(BRUG) +
+        (LAT && LON ? '&lat=' + encodeURIComponent(LAT) + '&lon=' + encodeURIComponent(LON) : '');
+      $('gastUrl').value = link; $('gastLink').hidden = false; $('gastNaam').value = '';
+      tekenGasten(j.gasten);
+    }).catch(function(f){ $('accFout').textContent = f.message || 'Mislukt'; }).then(function(){ knop.disabled = false; });
+  });
+  $('gastDeel').addEventListener('click', function(){
+    var link = $('gastUrl').value;
+    if (navigator.share) { navigator.share({ title: 'Thuis', text: 'Tijdelijke toegang tot het huis', url: link }).catch(function(){}); return; }
+    var klaar = function(){ melding('Link gekopieerd'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(klaar, function(){ $('gastUrl').select(); });
+    else { $('gastUrl').select(); try { document.execCommand('copy'); klaar(); } catch (e) {} }
+  });
+  // Lang indrukken op de datum: account van dit apparaat (inloggen, uitloggen, gasten)
   (function(){
     var t; var el = $('datum').parentNode;
-    el.addEventListener('pointerdown', function(){ t = setTimeout(function(){ toonKoppelen(); }, 900); });
+    el.addEventListener('pointerdown', function(){ t = setTimeout(function(){ toonAccount(); }, 900); });
     ['pointerup','pointerleave','pointercancel'].forEach(function(n){ el.addEventListener(n, function(){ clearTimeout(t); }); });
   })();
 
@@ -1528,7 +1751,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
   bouwPlan();
   addEventListener('resize', maat);
   addEventListener('orientationchange', pasAan);
-  // Nog geen sleutel op dit apparaat: eerst koppelen (of het voorbeeld bekijken)
+  // Nog niet ingelogd op dit apparaat: eerst inloggen (of het voorbeeld bekijken)
   if (!DEMO && !KEY) toonKoppelen(); else haalStand();
   // Via de brug thuis is de stand ophalen goedkoop: dan elke 10 s, anders volgens POLL
   setInterval(function(){

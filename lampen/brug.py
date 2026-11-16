@@ -40,6 +40,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import tinytuya
 
+import toegang
+
 AAN_CODES = ["switch_led", "switch_1", "switch"]
 HELDER_CODES = ["bright_value_v2", "bright_value", "bright_value_1"]
 TEMP_CODES = ["temp_value_v2", "temp_value"]
@@ -508,20 +510,64 @@ def geblokkeerd(afzender):
     return len(lijst) >= MAX_FOUT
 
 
-def verwerk(p, afzender="onbekend"):
-    actie = p.get("action") or "state"
-    if actie == "ping":
-        return {"ok": True, "brug": True}
-    # Rem op raden van de sleutel (de brug kan vanaf internet bereikbaar zijn)
-    if afzender != "onbekend" and geblokkeerd(afzender):
-        return {"ok": False, "fout": "Te veel pogingen, probeer het later opnieuw"}
-    if not hmac.compare_digest(str(p.get("key") or ""), str(CFG["key"])):
+def wie_is(p, afzender):
+    """Wie vraagt dit? Geeft {'naam', 'rol', 'soort'} of gooit toegang.Geweigerd.
+
+    - token: inlogbewijs van een lid (account bij Supabase, zie toegang.py)
+    - gast:  code uit een gastlink, geldig tot de einddatum
+    - key:   de oude gedeelde sleutel. Altijd goed vanaf de pc zelf (eigen scripts en testen);
+             van buitenaf alleen zolang 'sleutel_op_afstand' in de config niet op false staat.
+    """
+    if p.get("token"):
+        return toegang.lid(CFG, p["token"])
+    if p.get("gast"):
+        try:
+            return toegang.gast(MAP, p["gast"])
+        except toegang.Geweigerd:
+            MISLUKT.setdefault(afzender, []).append(time.time())
+            raise
+    lokaal = afzender == "onbekend"
+    if p.get("key") and (lokaal or CFG.get("sleutel_op_afstand", True)):
+        if hmac.compare_digest(str(p["key"]), str(CFG["key"])):
+            return {"naam": "sleutel", "rol": "eigenaar", "soort": "sleutel"}
+    if p.get("key"):
         MISLUKT.setdefault(afzender, []).append(time.time())
         if len(MISLUKT) > 5000:
             MISLUKT.clear()
         time.sleep(1)
         log(f"foute sleutel van {afzender}")
-        return {"ok": False, "fout": "Onjuiste sleutel"}
+        raise toegang.Geweigerd("Onjuiste sleutel")
+    raise toegang.Geweigerd("Niet ingelogd")
+
+
+def verwerk(p, afzender="onbekend"):
+    actie = p.get("action") or "state"
+    if actie == "ping":
+        return {"ok": True, "brug": True}
+    # Rem op raden van een sleutel of gastcode (de brug is vanaf internet bereikbaar)
+    if afzender != "onbekend" and geblokkeerd(afzender):
+        return {"ok": False, "fout": "Te veel pogingen, probeer het later opnieuw"}
+    try:
+        wie = wie_is(p, afzender)
+    except toegang.Geweigerd as e:
+        return {"ok": False, "fout": str(e), "brug": True, "geweigerd": True}
+    if actie == "ik":
+        return {"ok": True, "brug": True, "ik": wie}
+    if actie in ("gasten", "gast_maak", "gast_weg"):
+        if wie["rol"] != "eigenaar":
+            return {"ok": False, "fout": "Alleen een bewoner kan gasten beheren", "brug": True}
+        uit = {"ok": True, "brug": True}
+        try:
+            if actie == "gast_maak":
+                uit["gast"] = toegang.gast_maak(MAP, p.get("naam"), p.get("uren"), wie["naam"])
+                log(f"gast '{uit['gast']['naam']}' aangemaakt door {wie['naam']}")
+            elif actie == "gast_weg":
+                if toegang.gast_weg(MAP, str(p.get("id") or "")):
+                    log(f"gasttoegang ingetrokken door {wie['naam']}")
+        except toegang.Geweigerd as e:
+            return {"ok": False, "fout": str(e), "brug": True}
+        uit["gasten"] = toegang.gasten(MAP)
+        return uit
     if actie == "set":
         ids = p.get("ids") or []
         if isinstance(ids, str):
