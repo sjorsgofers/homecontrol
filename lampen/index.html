@@ -385,7 +385,6 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
   font-size:16px;color:var(--muted);cursor:pointer}
 .kaart button[type=submit]{background:var(--accent-grad);color:var(--accent-ink);font-weight:500}
 .kaart button:disabled{opacity:.5}
-.kaart .link{display:block;width:100%;height:auto;margin-top:8px;padding:8px 0;font-size:14px;text-align:center;text-decoration:underline}
 #account .kaart{max-height:92vh;overflow-y:auto}
 .gast{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:10px 14px;border:1px solid var(--lijn);
   border-radius:12px;background:var(--lamp-bg);font-size:15px}
@@ -495,7 +494,6 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
       <button type="button" id="koppelDemo">Voorbeeld bekijken</button>
       <button type="submit" id="koppelOk">Inloggen</button>
     </div>
-    <button type="button" class="link" id="koppelWissel">Nog geen account? Account maken</button>
   </form>
 </div>
 
@@ -860,7 +858,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
   function geweigerd(reden){
     if (!$('koppel').hidden) return;
     if (GAST) { GAST = ''; vergeet('gast'); KEY = ''; toonKoppelen((reden || 'Deze gasttoegang werkt niet meer') + '.'); return; }
-    if (sessie && reden === 'Dit account heeft nog geen toegang') { toonKoppelen('Dit account heeft nog geen toegang. Een bewoner moet je eerst toevoegen.'); return; }
+    if (sessie && reden === 'Dit account heeft nog geen toegang') { toonKoppelen('Dit account heeft geen toegang.'); return; }
     if (sessie) { zetSessie(null); toonKoppelen('Je bent uitgelogd. Log opnieuw in.'); return; }
     OUDE_SLEUTEL = ''; vergeet('key'); KEY = '';
     toonKoppelen('Log in met je account.');
@@ -1576,30 +1574,16 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
 
   /* ---------- Inloggen ----------
      Bewoners loggen in met e-mailadres en wachtwoord; het apparaat blijft daarna ingelogd.
-     Een nieuw account mag pas iets nadat een bewoner het heeft toegevoegd (tabel 'leden'). */
-  var nieuwAccount = false;
+     Nieuwe accounts aanmaken kan hier niet (staat ook bij Supabase uit): alleen de bewoners
+     hebben een account, alle anderen krijgen een gastlink. */
   function toonKoppelen(fout){
     $('koppelFout').textContent = fout || '';
     $('account').hidden = true;
     $('koppel').hidden = false;
   }
-  function zetKoppelStand(nieuw){
-    nieuwAccount = nieuw;
-    $('koppelKop').textContent = nieuw ? 'Account maken' : 'Inloggen';
-    $('koppelUitleg').textContent = nieuw ? 'Kies een wachtwoord. Daarna moet een bewoner je nog toegang geven.'
-                                          : 'Log in met je account om het huis te bedienen.';
-    $('koppelOk').textContent = nieuw ? 'Account maken' : 'Inloggen';
-    $('koppelWissel').textContent = nieuw ? 'Al een account? Inloggen' : 'Nog geen account? Account maken';
-    $('koppelWw').setAttribute('autocomplete', nieuw ? 'new-password' : 'current-password');
-    $('koppelFout').textContent = '';
-  }
-  $('koppelWissel').addEventListener('click', function(){ zetKoppelStand(!nieuwAccount); });
   function inlogFout(f){
     var c = f && f.code;
     if (c === 'invalid_credentials' || c === 'invalid_grant') return 'E-mailadres of wachtwoord klopt niet.';
-    if (c === 'user_already_exists' || c === 'email_exists') return 'Er bestaat al een account met dit e-mailadres. Log in.';
-    if (c === 'weak_password') return 'Kies een langer wachtwoord (minstens 6 tekens).';
-    if (c === 'signup_disabled') return 'Nieuwe accounts aanmaken staat uit. Vraag een bewoner.';
     if (c === 'email_not_confirmed') return 'Bevestig eerst je e-mailadres via de mail die je kreeg.';
     if (c === 'over_request_rate_limit' || (f && f.status === 429)) return 'Te veel pogingen. Probeer het over een paar minuten opnieuw.';
     return (f && f.message) || 'Inloggen mislukt';
@@ -1618,8 +1602,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     var mail = $('koppelMail').value.trim(), ww = $('koppelWw').value, plaats = $('koppelPlaats').value.trim();
     if (!mail || !ww) { $('koppelFout').textContent = 'Vul je e-mailadres en wachtwoord in.'; return; }
     $('koppelOk').disabled = true; $('koppelFout').textContent = 'Bezig…';
-    var stap = nieuwAccount ? supa('signup', { email: mail, password: ww }) : supa('token?grant_type=password', { email: mail, password: ww });
-    stap.then(function(j){
+    supa('token?grant_type=password', { email: mail, password: ww }).then(function(j){
       if (!j.access_token) throw new Error('Bevestig eerst je e-mailadres via de mail die je kreeg.');
       GAST = ''; vergeet('gast'); OUDE_SLEUTEL = ''; vergeet('key');
       zetSessie(j);
@@ -1631,10 +1614,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
       return vraag2({ action: 'ik', token: sessie.a });
     }).then(function(j){
       if (!j || !j.ok) {
-        if (j && j.fout === 'Dit account heeft nog geen toegang') {
-          zetKoppelStand(false);
-          throw new Error('Je account bestaat, maar heeft nog geen toegang. Een bewoner moet je eerst toevoegen.');
-        }
+        if (j && j.fout === 'Dit account heeft nog geen toegang') throw new Error('Dit account heeft geen toegang.');
         throw new Error((j && j.fout) || 'Onbekende fout');
       }
       DEMO = false;
