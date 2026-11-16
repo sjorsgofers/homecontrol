@@ -759,7 +759,9 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     });
   }
 
-  function stuur(ruimteId, ids, aan, helder, extra){
+  /* stil (optioneel): lampen die als offline gemeld staan. Ze krijgen de opdracht toch (die
+     melding loopt soms minuten achter), maar als ze niet reageren klagen we daar niet over. */
+  function stuur(ruimteId, ids, aan, helder, extra, stil){
     if (DEMO) return new Promise(function(ok){ setTimeout(ok, 350); });
     var body = { action: 'set', ids: ids };
     if (aan !== null) body.on = aan;
@@ -768,7 +770,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     if (extra && extra.kleur != null) body.kleur = extra.kleur;
     return vraag(body).then(function(j){
       if (!j.ok) throw new Error(j.fout || 'Onbekende fout');
-      var mis = (j.resultaat || []).filter(function(x){ return !x.ok; });
+      var mis = (j.resultaat || []).filter(function(x){ return !x.ok && !(stil && stil[x.id]); });
       if (mis.length) melding(mis.length + ' lamp' + (mis.length > 1 ? 'en reageerden' : ' reageerde') + ' niet');
       gemeld = ''; meld('geschakeld: ' + ids.length + ' lamp(en)' + (mis.length ? ', ' + mis.length + ' zonder reactie' : ''));
     });
@@ -780,8 +782,10 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
   function wijzig(r, lampen, aan, helder, extra){
     if (extra && extra.temp != null) lampen = lampen.filter(function(l){ return l.temp != null; });
     if (extra && extra.kleur != null) lampen = lampen.filter(function(l){ return l.rgb; });
-    var ids = lampen.filter(function(l){ return l.online; }).map(function(l){ return l.id; });
-    if (!ids.length) { melding('Geen lampen online in ' + r.name); return; }
+    var ids = lampen.map(function(l){ return l.id; });
+    if (!ids.length) return;
+    var stil = {};
+    lampen.forEach(function(l){ if (!l.online) stil[l.id] = true; });
     lampen.forEach(function(l){
       if (!l.online) return;
       if (aan !== null) l.on = aan;
@@ -791,7 +795,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     });
     bezig[r.id] = (bezig[r.id] || 0) + 1;
     teken();
-    stuur(r.id, ids, aan, helder, extra).catch(function(e){ melding('Mislukt: ' + (e.message || e)); })
+    stuur(r.id, ids, aan, helder, extra, stil).catch(function(e){ melding('Mislukt: ' + (e.message || e)); })
       .then(function(){
         bezig[r.id]--; if (!bezig[r.id]) delete bezig[r.id];
         clearTimeout(bijwerkTimer);
