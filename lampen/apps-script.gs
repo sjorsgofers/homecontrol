@@ -9,6 +9,7 @@
      TUYA_SECRET  Access Secret / Client Secret
      TUYA_REGIO   eu (standaard), us, cn of in
      SLEUTEL      zelfgekozen wachtwoord; de pagina moet dit meesturen
+     KACHEL       (optioneel) naam of apparaat-ID van de kachel; leeg = zelf zoeken
      RUIMTES      (optioneel) eigen indeling als JSON, bijvoorbeeld
                   {"Woonkamer":["Plafond","Staande lamp"],"Keuken":["Spots"]}
                   Namen of apparaat-ID's. Leeg = de ruimtes uit de app.
@@ -33,6 +34,10 @@ var AAN_CODES = ['switch_led', 'switch_1', 'switch'];
 var HELDER_CODES = ['bright_value_v2', 'bright_value', 'bright_value_1'];
 var TEMP_CODES = ['temp_value_v2', 'temp_value'];      /* warm (0) tot koud (1000) wit */
 var KLEUR_CODES = ['colour_data_v2', 'colour_data'];   /* kleur als {h, s, v} */
+/* De kachel: een Tuya-kachel (of een stekker met 'kachel' in de naam) die alleen aan/uit gaat. */
+var KACHEL_CATEGORIEEN = ['qn', 'kt', 'rs', 'dr'];
+var KACHEL_NAAM = /kachel|heater|eurom|verwarming/i;
+var KACHEL_AAN_CODES = ['switch', 'switch_1', 'Power', 'power'];
 
 /* ---------------------------- web-app ---------------------------- */
 
@@ -65,6 +70,10 @@ function verwerk_(p) {
       return { ok: true, resultaat: res };
     }
     if (p.action === 'agenda') return { ok: true, afspraken: agenda_() };
+    if (p.action === 'kachel') {
+      var kAan = p.on === undefined || p.on === '' ? null : (p.on === true || p.on === 'true' || p.on === '1');
+      return { ok: true, kachel: kachel_(kAan) };
+    }
     if (p.action === 'lokaal') return { ok: true, apparaten: lokaal_() };
     if (p.action === 'brug') {
       PropertiesService.getScriptProperties().setProperty('BRUG', String(p.url || ''));
@@ -74,7 +83,7 @@ function verwerk_(p) {
     if (p.action === 'scene') return { ok: true, scene: startScene_(p.name) };
     if (p.action === 'scenes') return { ok: true, scenes: scenes_().map(function (s) { return s.name; }) };
     if (p.action === 'refresh') {
-      CacheService.getScriptCache().removeAll(['apparaten', 'status', 'scenes', 'huizen', 'codes2']);
+      CacheService.getScriptCache().removeAll(['apparaten', 'status', 'scenes', 'huizen', 'codes2', 'kachel']);
     }
     return { ok: true, ruimtes: stand_(), brug: prop_('BRUG') };
   } catch (err) {
@@ -367,6 +376,48 @@ function agenda_() {
   });
   cache.put('agenda', JSON.stringify(uit), 300);
   return uit;
+}
+
+/* ----------------------------- kachel ----------------------------- */
+
+/* Zoekt de kachel tussen alle apparaten van het account; 10 minuten gecachet. */
+function kachelApparaat_() {
+  var cache = CacheService.getScriptCache();
+  var c = cache.get('kachel');
+  if (c) return JSON.parse(c);
+  var alles = alleApparaten_();
+  var wens = String(prop_('KACHEL') || '').trim().toLowerCase();
+  var k = null;
+  if (wens) {
+    k = alles.filter(function (d) { return d.id === wens || String(d.name).trim().toLowerCase() === wens; })[0];
+  } else {
+    k = alles.filter(function (d) { return KACHEL_NAAM.test(d.name || ''); })[0] ||
+        alles.filter(function (d) { return KACHEL_CATEGORIEEN.indexOf(d.category) >= 0; })[0];
+  }
+  var uit = k ? { id: k.id } : {
+    /* Niet gevonden: laat zien wat er wel is (alles wat geen lamp is), om de naam te kunnen kiezen */
+    andere: alles.filter(function (d) { return LAMP_CATEGORIEEN.indexOf(d.category) < 0; })
+                 .map(function (d) { return { name: d.name, category: d.category }; })
+  };
+  cache.put('kachel', JSON.stringify(uit), k ? 600 : 60);
+  return uit;
+}
+
+/* Stand van de kachel; met aan = true/false wordt hij eerst geschakeld. */
+function kachel_(aan) {
+  var k = kachelApparaat_();
+  if (!k.id) return { ok: false, fout: 'Geen kachel gevonden', andere: k.andere };
+  var d = tuya_('GET', '/v1.0/devices/' + k.id);
+  var s = {};
+  (d.status || []).forEach(function (x) { s[x.code] = x.value; });
+  var code = eersteCode_(s, KACHEL_AAN_CODES);
+  if (!code) return { ok: false, fout: 'De kachel heeft geen aan/uit-schakelaar', codes: Object.keys(s) };
+  var staatAan = s[code] === true;
+  if (aan !== null) {
+    tuya_('POST', '/v1.0/devices/' + k.id + '/commands', null, { commands: [{ code: code, value: aan }] });
+    staatAan = aan;
+  }
+  return { ok: true, naam: d.name, online: !!d.online, aan: staatAan };
 }
 
 /* ------------------- brug op het thuisnetwerk ------------------- */
