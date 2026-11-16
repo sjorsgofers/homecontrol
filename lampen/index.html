@@ -710,11 +710,18 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
      web-app. Het adres van de brug komt van de web-app en wordt op dit apparaat onthouden. */
   var BRUG = bewaar('brug', '');
   var brugUitTot = 0, viaBrug = false, laatsteStand = 0;
-  /* direct = true: altijd via de web-app (voor wat de brug toch alleen maar zou doorsturen) */
-  function vraag(opdracht, direct){
+  /* alleenBrug = true: voor wat alleen de brug thuis kan (de kachel schakelen). Dan altijd de brug
+     proberen, ook als die net even traag was, er langer op wachten en niet uitwijken naar de web-app. */
+  function vraag(opdracht, alleenBrug){
     var tekst = JSON.stringify(Object.assign({ key: KEY }, opdracht));
+    if (alleenBrug && BRUG) {
+      var stop2 = window.AbortController ? new AbortController() : null;
+      var timer2 = setTimeout(function(){ if (stop2) stop2.abort(); }, 8000);
+      return fetch(BRUG, { method:'POST', body: tekst, signal: stop2 ? stop2.signal : undefined })
+        .then(function(r){ clearTimeout(timer2); return r.json(); }, function(e){ clearTimeout(timer2); throw e; });
+    }
     function viaWebapp(){
-      if (!direct) viaBrug = false;
+      viaBrug = false;
       return fetch(API, { method:'POST', body: tekst }).then(function(r){ return r.json(); }).then(function(j){
         if (j && typeof j.brug === 'string' && j.brug !== BRUG) {
           BRUG = j.brug; brugUitTot = 0;
@@ -723,7 +730,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
         return j;
       });
     }
-    if (direct || !BRUG || Date.now() < brugUitTot) return viaWebapp();
+    if (!BRUG || Date.now() < brugUitTot) return viaWebapp();
     var stop = window.AbortController ? new AbortController() : null;
     var timer = setTimeout(function(){ if (stop) stop.abort(); }, 3000);
     return fetch(BRUG, { method:'POST', body: tekst, signal: stop ? stop.signal : undefined })
@@ -1314,12 +1321,20 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     if (DEMO) { kachel.aan = wens; tekenKachel(); return; }
     if (!kachel.online) { melding('De kachel is niet bereikbaar'); return; }
     kachelBezig = true; kachel.aan = wens; tekenKachel();
-    vraag({ action: 'kachel', on: wens }).then(function(j){
-      kachelBezig = false;
-      if (j && j.kachel && j.kachel.ok) { kachel = j.kachel; setTimeout(haalKachel, 5000); }
-      else { kachel.aan = !wens; melding('De kachel reageert niet'); }
-      tekenKachel();
-    }).catch(function(){ kachelBezig = false; kachel.aan = !wens; tekenKachel(); melding('De kachel reageert niet'); });
+    // Geduldig: tot drie pogingen via de brug voordat we zeggen dat het niet lukt
+    var poging = 0;
+    function probeer(){
+      poging++;
+      vraag({ action: 'kachel', on: wens }, true).then(function(j){
+        if (!(j && j.kachel && j.kachel.ok)) throw new Error('geen antwoord');
+        kachelBezig = false; kachel = j.kachel; tekenKachel();
+        setTimeout(haalKachel, 6000);
+      }).catch(function(){
+        if (poging < 3) { setTimeout(probeer, 1200); return; }
+        kachelBezig = false; kachel.aan = !wens; tekenKachel(); melding('De kachel reageert niet');
+      });
+    }
+    probeer();
   });
 
   /* ---------- Intercom beneden (Ring, via de brug thuis; zie intercom.py) ----------
