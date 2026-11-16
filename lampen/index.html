@@ -270,9 +270,14 @@ input[type=range].warm::-moz-range-progress{background:transparent}
 .th-knop:active{transform:scale(.92)}
 /* Tik op de temperatuur: menu met klokprogramma / handmatig */
 .th-nu{cursor:pointer}
-#zuiger{appearance:none;-webkit-appearance:none;justify-content:center;width:calc(var(--s)*76);height:calc(var(--s)*54);
+#zuiger,#kachel{appearance:none;-webkit-appearance:none;justify-content:center;width:calc(var(--s)*76);height:calc(var(--s)*54);
   margin-top:0;padding:0;cursor:pointer;transition:background .4s}
-#zuiger svg{margin:0;width:calc(var(--s)*38);height:calc(var(--s)*38);stroke:var(--ink-zacht);stroke-width:1.5}
+#zuiger svg,#kachel svg{margin:0;width:calc(var(--s)*38);height:calc(var(--s)*38);stroke:var(--ink-zacht);stroke-width:1.5}
+/* Kachel: gekleurd als hij aan staat; de warmtegolfjes zijn alleen dan te zien */
+#kachel .warm{opacity:0;transition:opacity .4s}
+#kachel.aan svg{stroke:var(--accent-tekst)}
+#kachel.aan .warm{opacity:1;animation:puls 2.4s ease-in-out infinite}
+#kachel.wacht{opacity:.6}
 #zuiger.bezig{background:var(--chip-aan)}
 #zuiger.bezig svg{stroke:var(--accent-tekst);animation:puls 1.4s ease-in-out infinite}
 #thMenu,#zuMenu,#belMenu{position:fixed;left:0;top:0;right:0;bottom:0;z-index:35;display:flex;align-items:center;justify-content:center;
@@ -345,7 +350,7 @@ input[type=range].warm::-moz-range-progress{background:transparent}
 @keyframes val{0%{transform:translateY(-3px);opacity:0}20%{opacity:1}80%{opacity:1}100%{transform:translateY(7px);opacity:0}}
 @keyframes flits{0%,58%{opacity:0}60%{opacity:1}64%{opacity:.15}68%{opacity:1}80%,100%{opacity:0}}
 
-/* Onderaan op een rij: 'Alle lampen uit', de stofzuiger en de partyknop */
+/* Onderaan op een rij: 'Alle lampen uit', de stofzuiger en de kachel */
 .rij{display:flex;align-items:center;margin-top:calc(var(--s)*16)}
 .rij > * + *{margin-left:calc(var(--s)*12)}
 /* De partyknop staat los van de rij: klein in de hoek rechtsboven */
@@ -392,8 +397,8 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
 .staand .chip{margin-right:calc(var(--s)*14)}
 .staand #party{margin-right:0}
 /* Op de telefoon is de stofzuigerknop anders lastig te raken */
-.staand #zuiger,.staand .uit-knop{width:calc(var(--s)*118);height:calc(var(--s)*76)}
-.staand #zuiger svg{width:calc(var(--s)*56);height:calc(var(--s)*56)}
+.staand #zuiger,.staand #kachel,.staand .uit-knop{width:calc(var(--s)*118);height:calc(var(--s)*76)}
+.staand #zuiger svg,.staand #kachel svg{width:calc(var(--s)*56);height:calc(var(--s)*56)}
 .staand .uit-knop svg{width:calc(var(--s)*50);height:calc(var(--s)*50)}
 </style>
 </head>
@@ -419,6 +424,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
       <div class="rij">
         <button class="uit-knop" id="allesUit" aria-label="Alle lampen uit" title="Alle lampen uit"><span id="uitIcoon"></span></button>
         <button class="chip" id="zuiger" aria-label="Stofzuiger" hidden></button>
+        <button class="chip" id="kachel" aria-label="Kachel" title="Kachel" hidden></button>
         <button class="chip" id="party" aria-label="Partymodus"></button>
       </div>
     </div>
@@ -543,6 +549,8 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     regen: svg('<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/><path d="M16 14v6M8 14v6M12 16v6"/>'),
     zuiger: svg('<path d="M2.5 17.5v-2.5a4 4 0 0 1 4-4h3.5a4 4 0 0 1 4 4v2.5z"/><circle cx="6" cy="19.3" r="1.7"/><path d="M5.5 13.2h5"/>' +
       '<path d="M14 14c2.2 0 3.6-1.4 3.6-3.6V5.2"/><path d="M16.2 5.2h3.4"/><path d="M19.6 5.2v12"/><path d="M17 20.5h5.5l-.9-3.3h-3.7z"/>'),
+    kachel: svg('<rect x="3.5" y="9" width="17" height="10" rx="2"/><path d="M7.5 12v4M10.5 12v4M13.5 12v4M16.5 12v4"/><path d="M6.5 19v2M17.5 19v2"/>' +
+      '<g class="warm"><path d="M8 6.5c-.9-1 .9-1.7 0-3M12 6.5c-.9-1 .9-1.7 0-3M16 6.5c-.9-1 .9-1.7 0-3"/></g>'),
     disco: svg('<path d="M12 2v5"/><circle cx="12" cy="14" r="7"/><path d="M5.4 12h13.2M5.4 16h13.2"/><path d="M12 7c-2.6 2-2.6 12 0 14M12 7c2.6 2 2.6 12 0 14"/>'),
     sneeuw: svg('<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/><path d="M8 15h.01M8 19h.01M12 17h.01M12 21h.01M16 15h.01M16 19h.01"/>')
   };
@@ -702,10 +710,11 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
      web-app. Het adres van de brug komt van de web-app en wordt op dit apparaat onthouden. */
   var BRUG = bewaar('brug', '');
   var brugUitTot = 0, viaBrug = false, laatsteStand = 0;
-  function vraag(opdracht){
+  /* direct = true: altijd via de web-app (voor wat de brug toch alleen maar zou doorsturen) */
+  function vraag(opdracht, direct){
     var tekst = JSON.stringify(Object.assign({ key: KEY }, opdracht));
     function viaWebapp(){
-      viaBrug = false;
+      if (!direct) viaBrug = false;
       return fetch(API, { method:'POST', body: tekst }).then(function(r){ return r.json(); }).then(function(j){
         if (j && typeof j.brug === 'string' && j.brug !== BRUG) {
           BRUG = j.brug; brugUitTot = 0;
@@ -714,7 +723,7 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
         return j;
       });
     }
-    if (!BRUG || Date.now() < brugUitTot) return viaWebapp();
+    if (direct || !BRUG || Date.now() < brugUitTot) return viaWebapp();
     var stop = window.AbortController ? new AbortController() : null;
     var timer = setTimeout(function(){ if (stop) stop.abort(); }, 3000);
     return fetch(BRUG, { method:'POST', body: tekst, signal: stop ? stop.signal : undefined })
@@ -1278,6 +1287,41 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
     });
   });
 
+  /* ---------- Kachel (Tuya, via de web-app) ----------
+     Het knopje verschijnt alleen als er een kachel is gevonden. Tik = aan of uit. */
+  var kachel = null, kachelBezig = false;
+  $('kachel').innerHTML = ICOON.kachel;
+  function tekenKachel(){
+    var k = kachel, knop = $('kachel');
+    knop.hidden = !(k && k.ok);
+    if (!k || !k.ok) return;
+    knop.classList.toggle('aan', !!k.aan);
+    knop.classList.toggle('wacht', kachelBezig);
+    knop.setAttribute('aria-pressed', k.aan ? 'true' : 'false');
+    knop.title = (k.naam || 'Kachel') + (k.aan ? ' staat aan' : ' staat uit');
+  }
+  function haalKachel(){
+    if (DEMO || !KEY || kachelBezig || document.hidden) return;
+    vraag({ action: 'kachel' }, true).then(function(j){
+      if (kachelBezig) return;
+      kachel = (j && j.kachel && j.kachel.ok) ? j.kachel : null;
+      tekenKachel();
+    }).catch(function(){});
+  }
+  $('kachel').addEventListener('click', function(){
+    if (!kachel || kachelBezig) return;
+    var wens = !kachel.aan;
+    if (DEMO) { kachel.aan = wens; tekenKachel(); return; }
+    if (!kachel.online) { melding('De kachel is niet bereikbaar'); return; }
+    kachelBezig = true; kachel.aan = wens; tekenKachel();
+    vraag({ action: 'kachel', on: wens }, true).then(function(j){
+      kachelBezig = false;
+      if (j && j.kachel && j.kachel.ok) { kachel = j.kachel; setTimeout(haalKachel, 5000); }
+      else { kachel.aan = !wens; melding('De kachel reageert niet'); }
+      tekenKachel();
+    }).catch(function(){ kachelBezig = false; kachel.aan = !wens; tekenKachel(); melding('De kachel reageert niet'); });
+  });
+
   /* ---------- Intercom beneden (Ring, via de brug thuis; zie intercom.py) ----------
      Wordt er aangebeld, dan klinkt er een bel en verschijnt de knop 'Deur openen'. De brug
      staat dat alleen toe in de eerste minuten na het aanbellen. Zonder brug gebeurt er niets. */
@@ -1479,6 +1523,8 @@ html:not(.staand) #party svg{width:calc(var(--s)*18);height:calc(var(--s)*18)}
   haalAgenda(); setInterval(haalAgenda, 10 * 60 * 1000);
   haalThermo(); setInterval(haalThermo, 60 * 1000);
   haalZuiger(); setInterval(haalZuiger, 30 * 1000);
+  if (DEMO) { kachel = { ok: true, naam: 'Kachel', online: true, aan: false }; tekenKachel(); }
+  haalKachel(); setInterval(haalKachel, 60 * 1000);
   // Proefdraaien zonder aan te bellen: zet #beltest in de link (opent de deur niet)
   if (hs.has('beltest')) setTimeout(function(){
     clearTimeout(belTimer);
